@@ -21,12 +21,20 @@ def dashboard():
     cursor.execute("SELECT SUM(quantity * price) FROM products")
     total_value = cursor.fetchone()[0] or 0
 
+    cursor.execute("""
+        SELECT category, SUM(quantity), SUM(quantity * price)
+        FROM products
+        GROUP BY category
+    """)
+    summary = cursor.fetchall()
+
     conn.close()
 
     return render_template(
         "dashboard.html",
         total_quantity=total_quantity,
-        total_value=round(total_value, 2)
+        total_value=round(total_value, 2),
+        summary=summary
     )
 
 
@@ -71,15 +79,20 @@ def add_product():
 # ---------------- INVENTORY ----------------
 @app.route("/inventory")
 def inventory():
+    category = request.args.get("category")
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM products")
-    products = cursor.fetchall()
+    if category:
+        cursor.execute("SELECT * FROM products WHERE category = ?", (category,))
+    else:
+        cursor.execute("SELECT * FROM products")
 
+    products = cursor.fetchall()
     conn.close()
 
-    return render_template("inventory.html", products=products)
+    return render_template("inventory.html", products=products, selected_category=category)
 
 
 # ---------------- EDIT PRODUCT ----------------

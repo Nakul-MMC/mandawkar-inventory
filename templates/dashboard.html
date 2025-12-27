@@ -21,3 +21,25 @@
     </div>
 </div>
 {% endblock %}
+
+<hr>
+<h4>Category-wise Summary</h4>
+
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      <th>Category</th>
+      <th>Total Quantity</th>
+      <th>Total Value (₹)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in summary %}
+    <tr>
+      <td>{{ s[0] }}</td>
+      <td>{{ s[1] }}</td>
+      <td>₹ {{ "%.2f"|format(s[2]) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

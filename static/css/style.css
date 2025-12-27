@@ -1,7 +1,12 @@
 body {
-    background-color: #f8f9fa;
+    background-color: #f4f6f9;
 }
 
 .card {
-    border-radius: 12px;
+    border-radius: 14px;
+}
+
+table th {
+    background-color: #212529;
+    color: white;
 }
