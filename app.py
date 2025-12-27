@@ -1,30 +1,95 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session
 from datetime import datetime
+from functools import wraps
+from werkzeug.security import check_password_hash
 from utils.db import create_tables, get_connection
 from utils.export_excel import export_inventory_to_excel
+from utils.invoice_pdf import generate_invoice_pdf
+from flask import send_file
 
 app = Flask(__name__)
+app.secret_key = "mandawkar-secret-key"  # required for sessions
 
-# Initialize DB tables
+# Initialize DB
 create_tables()
 
 
-# ---------------- DASHBOARD ----------------
+# =========================
+# AUTH DECORATOR
+# =========================
+def login_required(role=None):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if "user" not in session:
+                return redirect(url_for("login"))
+            if role and session.get("role") != role:
+                return "Access Denied", 403
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+# =========================
+# LOGIN / LOGOUT
+# =========================
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT * FROM users WHERE username = ?",
+            (request.form["username"],)
+        )
+        user = cursor.fetchone()
+        conn.close()
+
+        if user and check_password_hash(user[2], request.form["password"]):
+            session["user"] = user[1]
+            session["role"] = user[3]
+            return redirect(url_for("dashboard"))
+
+        return render_template("login.html", error="Invalid username or password")
+
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+# =========================
+# DASHBOARD
+# =========================
 @app.route("/")
+@login_required()
 def dashboard():
     conn = get_connection()
     cursor = conn.cursor()
 
+    # Overall totals
     cursor.execute("SELECT SUM(quantity) FROM products")
     total_quantity = cursor.fetchone()[0] or 0
 
     cursor.execute("SELECT SUM(quantity * price) FROM products")
     total_value = cursor.fetchone()[0] or 0
 
+    # 🔹 Detailed summary (same granularity as inventory)
     cursor.execute("""
-        SELECT category, SUM(quantity), SUM(quantity * price)
+        SELECT
+            category,
+            size,
+            type,
+            COALESCE(pattern, variant),
+            SUM(quantity) AS qty,
+            SUM(quantity * price) AS value
         FROM products
-        GROUP BY category
+        GROUP BY category, size, type, COALESCE(pattern, variant)
+        ORDER BY category, size
     """)
     summary = cursor.fetchall()
 
@@ -38,8 +103,12 @@ def dashboard():
     )
 
 
-# ---------------- CATEGORIES ----------------
+
+# =========================
+# CATEGORIES (ADMIN ONLY)
+# =========================
 @app.route("/categories", methods=["GET", "POST"])
+@login_required("admin")
 def categories():
     conn = get_connection()
     cursor = conn.cursor()
@@ -74,8 +143,11 @@ def categories():
     return render_template("categories.html", categories=categories, error=error)
 
 
-# ---------------- ADD PRODUCT ----------------
+# =========================
+# ADD PRODUCT
+# =========================
 @app.route("/add-product", methods=["GET", "POST"])
+@login_required()
 def add_product():
     conn = get_connection()
     cursor = conn.cursor()
@@ -95,6 +167,7 @@ def add_product():
             float(request.form["price"]),
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ))
+
         conn.commit()
         conn.close()
         return redirect(url_for("inventory"))
@@ -106,8 +179,11 @@ def add_product():
     return render_template("add_product.html", categories=categories)
 
 
-# ---------------- INVENTORY ----------------
+# =========================
+# INVENTORY
+# =========================
 @app.route("/inventory")
+@login_required()
 def inventory():
     category = request.args.get("category")
 
@@ -129,8 +205,11 @@ def inventory():
     )
 
 
-# ---------------- EDIT PRODUCT ----------------
+# =========================
+# EDIT PRODUCT
+# =========================
 @app.route("/edit/<int:product_id>", methods=["GET", "POST"])
+@login_required()
 def edit_product(product_id):
     conn = get_connection()
     cursor = conn.cursor()
@@ -157,8 +236,11 @@ def edit_product(product_id):
     return render_template("edit_product.html", product=product)
 
 
-# ---------------- DELETE PRODUCT (FIX) ----------------
+# =========================
+# DELETE PRODUCT
+# =========================
 @app.route("/delete-product/<int:product_id>", methods=["POST"])
+@login_required("admin")
 def delete_product(product_id):
     conn = get_connection()
     cursor = conn.cursor()
@@ -170,8 +252,11 @@ def delete_product(product_id):
     return redirect(url_for("inventory"))
 
 
-# ---------------- EXPORT ----------------
+# =========================
+# EXPORT TO EXCEL
+# =========================
 @app.route("/export")
+@login_required()
 def export():
     filename = export_inventory_to_excel()
     return f"""
@@ -180,7 +265,141 @@ def export():
         <b>{filename}</b><br><br>
         <a href="/inventory">Back to Inventory</a>
     """
+# =========================
+# Invoice
+# =========================
+@app.route("/invoice", methods=["GET", "POST"])
+@login_required("admin")
+def create_invoice():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if request.method == "POST":
+        subtotal = 0
+        items = []
+
+        cursor.execute("SELECT * FROM products")
+        products = cursor.fetchall()
+
+        for p in products:
+            qty = request.form.get(f"qty_{p[0]}")
+            if qty and int(qty) > 0:
+                qty = int(qty)
+                if qty > p[6]:
+                    return "Not enough stock", 400
+
+                # 🔹 Build PRODUCT DESCRIPTION properly
+                description_parts = [
+                    p[1],        # category
+                    p[3],        # type
+                    p[2],        # size
+                    p[5] or p[4] # pattern OR variant
+                ]
+
+                description = " - ".join(
+                    [str(x) for x in description_parts if x]
+                )
+
+                line_total = qty * p[7]
+                subtotal += line_total
+
+                items.append({
+                    "product_id": p[0],
+                    "description": description,
+                    "quantity": qty,
+                    "price": p[7],
+                    "total": line_total
+                })
+
+        # Discount logic
+        discount_input = float(request.form["discount"])
+        discount = subtotal * discount_input / 100 if discount_input <= 100 else discount_input
+
+        taxable_value = subtotal - discount
+
+        # GST enable / disable
+        enable_cgst = "enable_cgst" in request.form
+        enable_sgst = "enable_sgst" in request.form
+
+        cgst_percent = float(request.form["cgst_percent"]) if enable_cgst else 0
+        sgst_percent = float(request.form["sgst_percent"]) if enable_sgst else 0
+
+        cgst_amount = taxable_value * cgst_percent / 100
+        sgst_amount = taxable_value * sgst_percent / 100
+
+        total = taxable_value + cgst_amount + sgst_amount
+
+        # Insert invoice header
+        cursor.execute("""
+            INSERT INTO invoices
+            (customer_name, customer_gstin, subtotal, discount,
+             cgst_percent, cgst_amount,
+             sgst_percent, sgst_amount,
+             taxable_value, total, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            request.form["customer_name"],
+            request.form["customer_gstin"],
+            subtotal,
+            discount,
+            cgst_percent,
+            cgst_amount,
+            sgst_percent,
+            sgst_amount,
+            taxable_value,
+            total,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
+
+        invoice_id = cursor.lastrowid
+
+        # Insert invoice items & update stock
+        for item in items:
+            cursor.execute("""
+                INSERT INTO invoice_items
+                (invoice_id, product_id, product_name, quantity, price, total)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                invoice_id,
+                item["product_id"],
+                item["description"],
+                item["quantity"],
+                item["price"],
+                item["total"]
+            ))
+
+            cursor.execute("""
+                UPDATE products
+                SET quantity = quantity - ?
+                WHERE id = ?
+            """, (item["quantity"], item["product_id"]))
+
+        conn.commit()
+        conn.close()
+
+        return redirect(url_for("download_invoice", invoice_id=invoice_id))
+
+    cursor.execute("SELECT * FROM products")
+    products = cursor.fetchall()
+    conn.close()
+
+    return render_template("create_invoice.html", products=products)
 
 
+
+
+
+@app.route("/download-invoice/<int:invoice_id>")
+@login_required("admin")
+def download_invoice(invoice_id):
+    from utils.invoice_pdf import generate_invoice_pdf
+    file_path = generate_invoice_pdf(invoice_id)
+    return send_file(file_path, as_attachment=True)
+
+
+
+# =========================
+# START APP
+# =========================
 if __name__ == "__main__":
     app.run(debug=True)

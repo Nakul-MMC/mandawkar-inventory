@@ -1,43 +1,56 @@
 {% extends "base.html" %}
 
 {% block content %}
+
 <h3 class="mb-4">Dashboard</h3>
 
-<div class="row g-4">
+<!-- TOP METRICS -->
+<div class="row g-4 mb-4">
     <div class="col-md-3">
         <div class="card p-3">
-            <h6>Total Stock</h6>
+            <h6 class="text-muted">Total Stock Quantity</h6>
             <h2>{{ total_quantity }}</h2>
         </div>
     </div>
 
     <div class="col-md-3">
         <div class="card p-3">
-            <h6>Total Value</h6>
+            <h6 class="text-muted">Total Inventory Value</h6>
             <h2>₹ {{ total_value }}</h2>
         </div>
     </div>
 </div>
 
-<hr class="my-4">
+<!-- STOCK SUMMARY -->
+<div class="card p-3">
+    <h5 class="mb-3">Stock Summary</h5>
 
-<h5>Category Summary</h5>
-<table class="table table-hover mt-3">
-    <thead>
-        <tr>
-            <th>Category</th>
-            <th>Quantity</th>
-            <th>Value (₹)</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for s in summary %}
-        <tr>
-            <td>{{ s[0] }}</td>
-            <td>{{ s[1] }}</td>
-            <td>₹ {{ "%.2f"|format(s[2]) }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th>Category</th>
+                    <th>Size</th>
+                    <th>Type</th>
+                    <th>Pattern / Variant</th>
+                    <th>Quantity</th>
+                    <th>Total Value (₹)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in summary %}
+                <tr>
+                    <td>{{ s[0] }}</td>
+                    <td>{{ s[1] or "-" }}</td>
+                    <td>{{ s[2] or "-" }}</td>
+                    <td>{{ s[3] or "-" }}</td>
+                    <td>{{ s[4] }}</td>
+                    <td>₹ {{ "%.2f"|format(s[5]) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
 {% endblock %}
