@@ -1,20 +1,26 @@
 {% extends "base.html" %}
-
 {% block content %}
 
-<h3 class="mb-4">Dashboard</h3>
+<h3 class="mb-4">
+    Dashboard
+    {% if low_stock_count > 0 %}
+    <span class="badge bg-danger ms-2">
+        {{ low_stock_count }} Low Stock Items
+    </span>
+    {% endif %}
+</h3>
 
 <!-- TOP METRICS -->
 <div class="row g-4 mb-4">
     <div class="col-md-3">
-        <div class="card p-3">
+        <div class="card p-3 shadow-sm">
             <h6 class="text-muted">Total Stock Quantity</h6>
             <h2>{{ total_quantity }}</h2>
         </div>
     </div>
 
     <div class="col-md-3">
-        <div class="card p-3">
+        <div class="card p-3 shadow-sm">
             <h6 class="text-muted">Total Inventory Value</h6>
             <h2>₹ {{ total_value }}</h2>
         </div>
@@ -22,7 +28,7 @@
 </div>
 
 <!-- STOCK SUMMARY -->
-<div class="card p-3">
+<div class="card p-3 shadow-sm">
     <h5 class="mb-3">Stock Summary</h5>
 
     <div class="table-responsive">
@@ -39,7 +45,7 @@
             </thead>
             <tbody>
                 {% for s in summary %}
-                <tr>
+                <tr class="{% if s[4] <= 10 %}table-danger{% endif %}">
                     <td>{{ s[0] }}</td>
                     <td>{{ s[1] or "-" }}</td>
                     <td>{{ s[2] or "-" }}</td>

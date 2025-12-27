@@ -71,14 +71,15 @@ def dashboard():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Overall totals
+    # Total quantity
     cursor.execute("SELECT SUM(quantity) FROM products")
     total_quantity = cursor.fetchone()[0] or 0
 
+    # Total value
     cursor.execute("SELECT SUM(quantity * price) FROM products")
     total_value = cursor.fetchone()[0] or 0
 
-    # 🔹 Detailed summary (same granularity as inventory)
+    # Inventory-level summary
     cursor.execute("""
         SELECT
             category,
@@ -93,15 +94,23 @@ def dashboard():
     """)
     summary = cursor.fetchall()
 
+    # 🔴 LOW STOCK COUNT (THIS WAS MISSING)
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM products
+        WHERE quantity <= threshold
+    """)
+    low_stock_count = cursor.fetchone()[0]
+
     conn.close()
 
     return render_template(
         "dashboard.html",
         total_quantity=total_quantity,
         total_value=round(total_value, 2),
-        summary=summary
+        summary=summary,
+        low_stock_count=low_stock_count
     )
-
 
 
 # =========================
@@ -155,8 +164,8 @@ def add_product():
     if request.method == "POST":
         cursor.execute("""
             INSERT INTO products
-            (category, size, type, variant, pattern, quantity, price, last_updated)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (category, size, type, variant, pattern, quantity, threshold, price, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             request.form["category"],
             request.form.get("size"),
@@ -164,6 +173,7 @@ def add_product():
             request.form.get("variant"),
             request.form.get("pattern"),
             int(request.form["quantity"]),
+            int(request.form["threshold"]),
             float(request.form["price"]),
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ))
@@ -217,10 +227,11 @@ def edit_product(product_id):
     if request.method == "POST":
         cursor.execute("""
             UPDATE products
-            SET quantity = ?, price = ?, last_updated = ?
+            SET quantity = ?, threshold = ?, price = ?, last_updated = ?
             WHERE id = ?
         """, (
             int(request.form["quantity"]),
+            int(request.form["threshold"]),
             float(request.form["price"]),
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             product_id
