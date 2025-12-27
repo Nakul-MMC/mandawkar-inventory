@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3 class="mb-4">Sales Report</h3>
+
+<!-- CHARTS -->
+<div class="row mb-5">
+  <div class="col-md-6">
+    <h5>Daily Sales</h5>
+    <canvas id="dailyChart"></canvas>
+  </div>
+
+  <div class="col-md-6">
+    <h5>Monthly Sales</h5>
+    <canvas id="monthlyChart"></canvas>
+  </div>
+</div>
+
+<!-- GST SUMMARY -->
+<h5>GST Collected</h5>
+<p>
+  CGST: ₹ {{ "%.2f"|format(gst[0] or 0) }} <br>
+  SGST: ₹ {{ "%.2f"|format(gst[1] or 0) }}
+</p>
+
+<!-- TABLES -->
+<hr>
+
+<h5>Daily Sales (Table)</h5>
+<table class="table table-bordered mb-4">
+  <tr>
+    <th>Date</th>
+    <th>Total Sales (₹)</th>
+  </tr>
+  {% for d in daily %}
+  <tr>
+    <td>{{ d[0] }}</td>
+    <td>₹ {{ "%.2f"|format(d[1]) }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h5>Monthly Sales (Table)</h5>
+<table class="table table-bordered">
+  <tr>
+    <th>Month</th>
+    <th>Total Sales (₹)</th>
+  </tr>
+  {% for m in monthly %}
+  <tr>
+    <td>{{ m[0] }}</td>
+    <td>₹ {{ "%.2f"|format(m[1]) }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<!-- CHART.JS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const dailyLabels = {{ daily | map(attribute=0) | list | tojson }};
+  const dailyData = {{ daily | map(attribute=1) | list | tojson }};
+
+  new Chart(document.getElementById('dailyChart'), {
+    type: 'line',
+    data: {
+      labels: dailyLabels,
+      datasets: [{
+        label: 'Daily Sales',
+        data: dailyData,
+        fill: false,
+        tension: 0.3
+      }]
+    }
+  });
+
+  const monthlyLabels = {{ monthly | map(attribute=0) | list | tojson }};
+  const monthlyData = {{ monthly | map(attribute=1) | list | tojson }};
+
+  new Chart(document.getElementById('monthlyChart'), {
+    type: 'bar',
+    data: {
+      labels: monthlyLabels,
+      datasets: [{
+        label: 'Monthly Sales',
+        data: monthlyData
+      }]
+    }
+  });
+</script>
+
+{% endblock %}

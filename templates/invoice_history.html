@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3 class="mb-3">Invoice History</h3>
+
+<div class="table-responsive">
+<table class="table table-bordered table-hover align-middle">
+    <thead class="table-dark">
+        <tr>
+            <th>Invoice No</th>
+            <th>Date</th>
+            <th>Customer</th>
+            <th>GSTIN</th>
+            <th>Total (₹)</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for i in invoices %}
+        <tr>
+            <td>{{ i[0] }}</td>
+            <td>{{ i[4][:10] }}</td>
+            <td>{{ i[1] }}</td>
+            <td>{{ i[2] or "-" }}</td>
+            <td>₹ {{ "%.2f"|format(i[3]) }}</td>
+            <td>
+                <a href="/download-invoice/{{ i[0] }}" class="btn btn-sm btn-primary">
+                    Reprint
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+{% endblock %}

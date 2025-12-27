@@ -6,6 +6,7 @@ from utils.db import create_tables, get_connection
 from utils.export_excel import export_inventory_to_excel
 from utils.invoice_pdf import generate_invoice_pdf
 from flask import send_file
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = "mandawkar-secret-key"  # required for sessions
@@ -359,7 +360,7 @@ def create_invoice():
             sgst_amount,
             taxable_value,
             total,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            request.form["invoice_date"] + " " + datetime.now().strftime("%H:%M:%S")
         ))
 
         invoice_id = cursor.lastrowid
@@ -394,9 +395,34 @@ def create_invoice():
     products = cursor.fetchall()
     conn.close()
 
-    return render_template("create_invoice.html", products=products)
+    return render_template(
+    "create_invoice.html",
+    products=products,
+    today=datetime.now().strftime("%Y-%m-%d")
+)
 
 
+
+@app.route("/invoices")
+@login_required("admin")
+def invoice_history():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            id,
+            customer_name,
+            customer_gstin,
+            total,
+            created_at
+        FROM invoices
+        ORDER BY created_at DESC
+    """)
+    invoices = cursor.fetchall()
+    conn.close()
+
+    return render_template("invoice_history.html", invoices=invoices)
 
 
 
@@ -406,6 +432,46 @@ def download_invoice(invoice_id):
     from utils.invoice_pdf import generate_invoice_pdf
     file_path = generate_invoice_pdf(invoice_id)
     return send_file(file_path, as_attachment=True)
+
+
+
+@app.route("/sales-report")
+@login_required("admin")
+def sales_report():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT DATE(created_at), SUM(total)
+        FROM invoices
+        GROUP BY DATE(created_at)
+        ORDER BY DATE(created_at)
+    """)
+    daily = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT strftime('%Y-%m', created_at), SUM(total)
+        FROM invoices
+        GROUP BY strftime('%Y-%m', created_at)
+        ORDER BY strftime('%Y-%m', created_at)
+    """)
+    monthly = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT SUM(cgst_amount), SUM(sgst_amount)
+        FROM invoices
+    """)
+    gst = cursor.fetchone()
+
+    conn.close()
+
+    return render_template(
+        "sales_report.html",
+        daily=daily,
+        monthly=monthly,
+        gst=gst
+    )
+
 
 
 
