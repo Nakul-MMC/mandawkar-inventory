@@ -9,6 +9,7 @@ def create_tables():
     conn = get_connection()
     cursor = conn.cursor()
 
+    # Products table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,6 +23,25 @@ def create_tables():
             last_updated TEXT NOT NULL
         )
     """)
+
+    # Categories table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        )
+    """)
+
+    # Insert default categories (only once)
+    cursor.executemany("""
+        INSERT OR IGNORE INTO categories (name)
+        VALUES (?)
+    """, [
+        ("Tiles",),
+        ("Granite",),
+        ("Kadappa",),
+        ("Chemicals",)
+    ])
 
     conn.commit()
     conn.close()

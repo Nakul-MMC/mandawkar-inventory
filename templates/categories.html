@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3 class="mb-4">Manage Categories</h3>
+
+<form method="POST" class="row g-3 mb-4">
+    <div class="col-md-4">
+        <input
+            name="name"
+            class="form-control"
+            placeholder="Enter new category name"
+            required>
+    </div>
+    <div class="col-md-2">
+        <button class="btn btn-primary w-100">
+            Add Category
+        </button>
+    </div>
+</form>
+
+<div class="card p-3 w-50">
+    <h6>Existing Categories</h6>
+    <ul class="list-group list-group-flush">
+        {% for c in categories %}
+        <li class="list-group-item">{{ c[1] }}</li>
+        {% endfor %}
+    </ul>
+</div>
+
+{% endblock %}

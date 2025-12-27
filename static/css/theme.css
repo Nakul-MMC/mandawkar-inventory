@@ -1,0 +1,60 @@
+body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background: #f5f6fa;
+}
+
+.app-container {
+    display: flex;
+    height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 240px;
+    background: linear-gradient(180deg, #5f2eea, #7433ff);
+    color: white;
+    padding: 25px;
+}
+
+.brand {
+    text-align: center;
+    font-weight: bold;
+    margin-bottom: 40px;
+}
+
+.menu {
+    list-style: none;
+    padding: 0;
+}
+
+.menu li {
+    margin: 18px 0;
+}
+
+.menu a {
+    color: white;
+    text-decoration: none;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.menu a:hover {
+    opacity: 0.85;
+}
+
+/* Content */
+.content {
+    flex: 1;
+    padding: 30px;
+    overflow-y: auto;
+}
+
+/* Cards */
+.card {
+    border-radius: 14px;
+    border: none;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+}

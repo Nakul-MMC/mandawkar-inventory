@@ -5,7 +5,7 @@ from utils.export_excel import export_inventory_to_excel
 
 app = Flask(__name__)
 
-# Create DB tables on startup
+# Initialize DB
 create_tables()
 
 
@@ -38,42 +38,58 @@ def dashboard():
     )
 
 
+# ---------------- CATEGORIES ----------------
+@app.route("/categories", methods=["GET", "POST"])
+def categories():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if request.method == "POST":
+        name = request.form["name"].strip()
+        cursor.execute(
+            "INSERT OR IGNORE INTO categories (name) VALUES (?)",
+            (name,)
+        )
+        conn.commit()
+
+    cursor.execute("SELECT * FROM categories ORDER BY name")
+    categories = cursor.fetchall()
+    conn.close()
+
+    return render_template("categories.html", categories=categories)
+
+
 # ---------------- ADD PRODUCT ----------------
 @app.route("/add-product", methods=["GET", "POST"])
 def add_product():
+    conn = get_connection()
+    cursor = conn.cursor()
+
     if request.method == "POST":
-        category = request.form["category"]
-        size = request.form.get("size")
-        type_ = request.form.get("type")
-        variant = request.form.get("variant")
-        pattern = request.form.get("pattern")
-        quantity = int(request.form["quantity"])
-        price = float(request.form["price"])
-
-        conn = get_connection()
-        cursor = conn.cursor()
-
         cursor.execute("""
             INSERT INTO products
             (category, size, type, variant, pattern, quantity, price, last_updated)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            category,
-            size,
-            type_,
-            variant,
-            pattern,
-            quantity,
-            price,
+            request.form["category"],
+            request.form.get("size"),
+            request.form.get("type"),
+            request.form.get("variant"),
+            request.form.get("pattern"),
+            int(request.form["quantity"]),
+            float(request.form["price"]),
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ))
 
         conn.commit()
         conn.close()
-
         return redirect(url_for("inventory"))
 
-    return render_template("add_product.html")
+    cursor.execute("SELECT * FROM categories ORDER BY name")
+    categories = cursor.fetchall()
+    conn.close()
+
+    return render_template("add_product.html", categories=categories)
 
 
 # ---------------- INVENTORY ----------------
@@ -92,7 +108,11 @@ def inventory():
     products = cursor.fetchall()
     conn.close()
 
-    return render_template("inventory.html", products=products, selected_category=category)
+    return render_template(
+        "inventory.html",
+        products=products,
+        selected_category=category
+    )
 
 
 # ---------------- EDIT PRODUCT ----------------
@@ -102,16 +122,13 @@ def edit_product(product_id):
     cursor = conn.cursor()
 
     if request.method == "POST":
-        quantity = int(request.form["quantity"])
-        price = float(request.form["price"])
-
         cursor.execute("""
             UPDATE products
             SET quantity = ?, price = ?, last_updated = ?
             WHERE id = ?
         """, (
-            quantity,
-            price,
+            int(request.form["quantity"]),
+            float(request.form["price"]),
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             product_id
         ))
