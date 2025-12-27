@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h3>Edit Product</h3>
+
+<form method="POST">
+  <div class="row">
+    <div class="col-md-4 mb-3">
+      <label>Quantity</label>
+      <input type="number" name="quantity" value="{{ product[6] }}" class="form-control" required>
+    </div>
+
+    <div class="col-md-4 mb-3">
+      <label>Price</label>
+      <input type="number" step="0.01" name="price" value="{{ product[7] }}" class="form-control" required>
+    </div>
+  </div>
+
+  <button class="btn btn-primary">Update</button>
+  <a href="/inventory" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for
 from datetime import datetime
 from utils.db import create_tables, get_connection
+from utils.export_excel import export_inventory_to_excel
 
 app = Flask(__name__)
 
@@ -67,7 +68,7 @@ def add_product():
     return render_template("add_product.html")
 
 
-# ---------------- INVENTORY LIST ----------------
+# ---------------- INVENTORY ----------------
 @app.route("/inventory")
 def inventory():
     conn = get_connection()
@@ -79,6 +80,50 @@ def inventory():
     conn.close()
 
     return render_template("inventory.html", products=products)
+
+
+# ---------------- EDIT PRODUCT ----------------
+@app.route("/edit/<int:product_id>", methods=["GET", "POST"])
+def edit_product(product_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    if request.method == "POST":
+        quantity = int(request.form["quantity"])
+        price = float(request.form["price"])
+
+        cursor.execute("""
+            UPDATE products
+            SET quantity = ?, price = ?, last_updated = ?
+            WHERE id = ?
+        """, (
+            quantity,
+            price,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            product_id
+        ))
+
+        conn.commit()
+        conn.close()
+        return redirect(url_for("inventory"))
+
+    cursor.execute("SELECT * FROM products WHERE id = ?", (product_id,))
+    product = cursor.fetchone()
+    conn.close()
+
+    return render_template("edit_product.html", product=product)
+
+
+# ---------------- EXPORT ----------------
+@app.route("/export")
+def export():
+    filename = export_inventory_to_excel()
+    return f"""
+        <h3>Export Successful</h3>
+        <p>File saved at:</p>
+        <b>{filename}</b><br><br>
+        <a href="/inventory">Back to Inventory</a>
+    """
 
 
 if __name__ == "__main__":
