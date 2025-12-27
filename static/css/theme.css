@@ -65,3 +65,20 @@ body {
     left: 25px;
     font-size: 13px;
 }
+
+/* Professional watermark */
+.watermark {
+    position: fixed;
+    bottom: 12px;
+    right: 16px;
+
+    font-size: 11px;
+    font-style: italic;
+    letter-spacing: 0.4px;
+
+    color: rgba(0, 0, 0, 0.35);
+
+    z-index: 999999;
+    pointer-events: none;
+    user-select: none;
+}
