@@ -3,7 +3,13 @@
 
 <h3 class="mb-4">Manage Categories</h3>
 
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<!-- Add Category -->
 <form method="POST" class="row g-3 mb-4">
+    <input type="hidden" name="add" value="1">
     <div class="col-md-4">
         <input
             name="name"
@@ -12,17 +18,26 @@
             required>
     </div>
     <div class="col-md-2">
-        <button class="btn btn-primary w-100">
-            Add Category
-        </button>
+        <button class="btn btn-primary w-100">Add Category</button>
     </div>
 </form>
 
+<!-- Existing Categories -->
 <div class="card p-3 w-50">
     <h6>Existing Categories</h6>
     <ul class="list-group list-group-flush">
         {% for c in categories %}
-        <li class="list-group-item">{{ c[1] }}</li>
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            {{ c[1] }}
+
+            <form method="POST"
+                  onsubmit="return confirm('Are you sure you want to delete this category?');"
+                  style="margin:0;">
+                <input type="hidden" name="delete" value="1">
+                <input type="hidden" name="category_id" value="{{ c[0] }}">
+                <button class="btn btn-sm btn-danger">Delete</button>
+            </form>
+        </li>
         {% endfor %}
     </ul>
 </div>

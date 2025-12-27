@@ -5,7 +5,7 @@ from utils.export_excel import export_inventory_to_excel
 
 app = Flask(__name__)
 
-# Initialize DB
+# Initialize DB tables
 create_tables()
 
 
@@ -43,20 +43,35 @@ def dashboard():
 def categories():
     conn = get_connection()
     cursor = conn.cursor()
+    error = None
 
-    if request.method == "POST":
-        name = request.form["name"].strip()
+    if request.method == "POST" and "add" in request.form:
         cursor.execute(
             "INSERT OR IGNORE INTO categories (name) VALUES (?)",
-            (name,)
+            (request.form["name"].strip(),)
         )
         conn.commit()
+
+    if request.method == "POST" and "delete" in request.form:
+        category_id = request.form["category_id"]
+
+        cursor.execute("""
+            SELECT COUNT(*) FROM products
+            WHERE category = (SELECT name FROM categories WHERE id = ?)
+        """, (category_id,))
+        count = cursor.fetchone()[0]
+
+        if count > 0:
+            error = "Cannot delete category. Products exist under this category."
+        else:
+            cursor.execute("DELETE FROM categories WHERE id = ?", (category_id,))
+            conn.commit()
 
     cursor.execute("SELECT * FROM categories ORDER BY name")
     categories = cursor.fetchall()
     conn.close()
 
-    return render_template("categories.html", categories=categories)
+    return render_template("categories.html", categories=categories, error=error)
 
 
 # ---------------- ADD PRODUCT ----------------
@@ -80,7 +95,6 @@ def add_product():
             float(request.form["price"]),
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ))
-
         conn.commit()
         conn.close()
         return redirect(url_for("inventory"))
@@ -132,7 +146,6 @@ def edit_product(product_id):
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             product_id
         ))
-
         conn.commit()
         conn.close()
         return redirect(url_for("inventory"))
@@ -142,6 +155,19 @@ def edit_product(product_id):
     conn.close()
 
     return render_template("edit_product.html", product=product)
+
+
+# ---------------- DELETE PRODUCT (FIX) ----------------
+@app.route("/delete-product/<int:product_id>", methods=["POST"])
+def delete_product(product_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM products WHERE id = ?", (product_id,))
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for("inventory"))
 
 
 # ---------------- EXPORT ----------------
