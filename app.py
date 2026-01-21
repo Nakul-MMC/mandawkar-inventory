@@ -8,12 +8,12 @@ import uuid
 import os
 
 app = Flask(__name__)
-app.secret_key = "mandawkar-secret-key"  # required for sessions
+app.secret_key = os.environ.get("SECRET_KEY", "mandawkar-secret-key")  # required for sessions
 
 from models import db, User, Product, Category, Invoice, InvoiceItem, AuditLog
 import os
 
-app = Flask(__name__)
+# app = Flask(__name__) ALREADY DEFINED ABOVE
 # Database Configuration
 # In production, we use the DATABASE_URL environment variable.
 # In development, we fallback to local SQLite.
