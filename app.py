@@ -14,8 +14,14 @@ from models import db, User, Product, Category, Invoice, InvoiceItem, AuditLog
 import os
 
 app = Flask(__name__)
-app.secret_key = "mandawkar-secret-key"
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
+# Database Configuration
+# In production, we use the DATABASE_URL environment variable.
+# In development, we fallback to local SQLite.
+db_url = os.environ.get('DATABASE_URL', 'sqlite:///db.sqlite3')
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1) # Fix for Render/Heroku
+
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
