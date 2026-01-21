@@ -1,99 +1,154 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h3>Generate GST Invoice</h3>
+<form method="POST" class="h-full flex flex-col" x-data="{ total: 0 }">
 
-<form method="POST">
+  <!-- TOP SECTION: Customer & Settings (Compact 2-Col) -->
+  <div class="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
 
-  <!-- CUSTOMER DETAILS -->
-  <div class="row g-3 mb-3">
-    <div class="col-md-4">
-      <label>Customer Name</label>
-      <input name="customer_name" class="form-control" required>
-    </div>
-
-    <div class="col-md-4">
-      <label>Customer GSTIN</label>
-      <input name="customer_gstin" class="form-control">
-    </div>
-
-    <div class="col-md-4">
-      <label>Discount</label>
-      <input name="discount" type="number" step="0.01" value="0" class="form-control">
-      <small class="text-muted">≤100 = %, >100 = ₹</small>
-    </div>
-  </div>
-    <div class="col-md-4">
-  <label>Invoice Date</label>
-  <input type="date"
-         name="invoice_date"
-         value="{{ today }}"
-         class="form-control"
-         required>
-</div>
-
-
-  <!-- GST CONTROLS -->
-  <div class="row g-3 mb-4">
-    <div class="col-md-3">
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" name="enable_cgst" checked>
-        <label class="form-check-label">Enable CGST</label>
+    <!-- Customer Info (Cols 1-7) -->
+    <div class="md:col-span-7 bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-center">
+      <div class="flex items-center space-x-3 mb-3">
+        <div class="w-1/2">
+          <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Customer Name</label>
+          <input name="customer_name" required type="text" list="customer_list" autocomplete="off"
+            placeholder="Select or Type Name"
+            class="w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white text-sm py-2 px-3 focus:ring-2 focus:ring-blue-500 transition-colors">
+          <datalist id="customer_list">
+            {% for c in customers %}
+            <option value="{{ c.name }}"></option>
+            {% endfor %}
+          </datalist>
+        </div>
+        <div class="w-1/2">
+          <label class="block text-xs font-bold text-gray-500 uppercase mb-1">GSTIN (Optional)</label>
+          <input name="customer_gstin" type="text" placeholder="e.g. 27ABC..."
+            class="w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white text-sm py-2 px-3 focus:ring-2 focus:ring-blue-500">
+        </div>
       </div>
-      <input name="cgst_percent" type="number" step="0.01" value="9" class="form-control mt-1">
-    </div>
-
-    <div class="col-md-3">
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" name="enable_sgst" checked>
-        <label class="form-check-label">Enable SGST</label>
+      <div class="w-full">
+        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Invoice Date</label>
+        <input name="invoice_date" type="date" value="{{ today }}" required
+          class="w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white text-sm py-2 px-3 focus:ring-2 focus:ring-blue-500">
       </div>
-      <input name="sgst_percent" type="number" step="0.01" value="9" class="form-control mt-1">
+    </div>
+
+    <!-- Billing Settings (Cols 8-12) -->
+    <div class="md:col-span-5 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <div class="mb-3">
+        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Discount</label>
+        <div class="flex items-center">
+          <input name="discount" type="number" step="0.01" value="0"
+            class="w-full rounded-l-lg border-gray-200 bg-gray-50 focus:bg-white text-sm py-2 px-3 focus:ring-2 focus:ring-blue-500">
+          <span class="bg-gray-100 border border-l-0 border-gray-200 rounded-r-lg px-3 py-2 text-xs text-gray-500">% or
+            ₹</span>
+        </div>
+      </div>
+
+      <div class="flex space-x-3">
+        <div class="flex-1">
+          <label class="flex items-center text-xs font-bold text-gray-500 uppercase mb-1">
+            <input type="checkbox" name="enable_cgst" checked
+              class="rounded text-blue-600 focus:ring-blue-500 mr-2 h-3 w-3">
+            CGST %
+          </label>
+          <input name="cgst_percent" type="number" step="0.01" value="9"
+            class="w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white text-sm py-2 px-3 text-center">
+        </div>
+        <div class="flex-1">
+          <label class="flex items-center text-xs font-bold text-gray-500 uppercase mb-1">
+            <input type="checkbox" name="enable_sgst" checked
+              class="rounded text-blue-600 focus:ring-blue-500 mr-2 h-3 w-3">
+            SGST %
+          </label>
+          <input name="sgst_percent" type="number" step="0.01" value="9"
+            class="w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white text-sm py-2 px-3 text-center">
+        </div>
+      </div>
     </div>
   </div>
 
-  <hr>
+  <!-- MIDDLE SECTION: Scrollable Product Table -->
+  <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden mb-20">
+    <!-- mb-20 for sticky footer space -->
 
-  <!-- PRODUCTS -->
-  <h5>Add Products</h5>
-
-  {% for p in products %}
-  <div class="row align-items-center mb-2">
-
-    <!-- PRODUCT DESCRIPTION -->
-    <div class="col-md-6">
-      <strong>
-        {{ p[1] }}
-        {% if p[2] %} - {{ p[2] }}{% endif %}
-        {% if p[3] %} - {{ p[3] }}{% endif %}
-        {% if p[5] %} - {{ p[5] }}
-        {% elif p[4] %} - {{ p[4] }}
-        {% endif %}
-      </strong>
-      <br>
-      <small class="text-muted">Stock: {{ p[6] }}</small>
+    <!-- Sticky Header -->
+    <div
+      class="bg-gray-50 border-b border-gray-200 px-4 py-3 grid grid-cols-12 gap-4 text-xs font-bold text-gray-500 uppercase">
+      <div class="col-span-6">Product Item</div>
+      <div class="col-span-2 text-center">Stock</div>
+      <div class="col-span-2 text-right">Price (₹)</div>
+      <div class="col-span-2 text-center">Qty</div>
     </div>
 
-    <!-- PRICE -->
-    <div class="col-md-2">
-      ₹ {{ "%.2f"|format(p[8]) }}
-    </div>
+    <!-- Scrollable Body -->
+    <div class="overflow-y-auto flex-1 p-2 space-y-1">
+      {% for p in products %}
+      <div
+        class="grid grid-cols-12 gap-4 items-center p-2 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100 group">
 
-    <!-- QUANTITY -->
-    <div class="col-md-2">
-      <input type="number"
-             name="qty_{{ p[0] }}"
-             min="0"
-             max="{{ p[6] }}"
-             class="form-control">
-    </div>
+        <!-- Product Name -->
+        <div class="col-span-6">
+          <div class="font-medium text-gray-800 text-sm truncate" title="{{ p[1] }} {{ p[2] }}">
+            {{ p[2] }} <span class="text-gray-400">|</span> {{ p[1] }}
+          </div>
+          <div class="text-xs text-gray-400 truncate">
+            {{ p[5] or p[4] or "Std" }} {% if p[3] %}• {{ p[3] }}{% endif %}
+          </div>
+        </div>
 
+        <!-- Stock -->
+        <div class="col-span-2 text-center">
+          <span
+            class="text-xs font-bold py-1 px-2 rounded-full {% if p[6] == 0 %}bg-red-100 text-red-600{% else %}bg-emerald-100 text-emerald-600{% endif %}">
+            {{ p[6] }}
+          </span>
+        </div>
+
+        <!-- Price Input -->
+        <div class="col-span-2">
+          <input type="number" name="price_{{ p[0] }}" value="{{ p[8] }}" step="0.01"
+            class="w-full text-sm text-right bg-transparent border-none p-1 focus:ring-0 group-hover:bg-white group-hover:shadow-sm rounded transition-all placeholder-gray-300">
+        </div>
+
+        <!-- Qty Input -->
+        <div class="col-span-2">
+          <input type="number" name="qty_{{ p[0] }}" min="0" max="{{ p[6] }}" placeholder="-"
+            oninput="if(this.value > 0) { this.classList.add('bg-blue-600', 'text-white', 'font-bold'); } else { this.classList.remove('bg-blue-600', 'text-white', 'font-bold'); }"
+            class="w-full text-center text-sm border-gray-200 bg-gray-50 rounded-md py-1.5 focus:ring-2 focus:ring-blue-500 transition-all font-medium">
+        </div>
+      </div>
+      {% endfor %}
+
+      {% if not products %}
+      <div class="text-center py-10 text-gray-400">
+        <i class="bi bi-box-seam text-4xl mb-2 block"></i>
+        No products found in inventory.
+      </div>
+      {% endif %}
+    </div>
   </div>
-  {% endfor %}
 
-  <button class="btn btn-primary mt-4">
-    Generate Invoice
-  </button>
+  <!-- BOTTOM SECTION: Sticky Action Footer -->
+  <div
+    class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] p-4 z-20 md:pl-64">
+    <!-- md:pl-64 for sidebar offset -->
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+
+      <div class="flex items-center space-x-6">
+        <!-- Helper Text -->
+        <div class="hidden md:block text-sm text-gray-500">
+          <i class="bi bi-info-circle mr-1"></i> Enter Quantities to select items.
+        </div>
+      </div>
+
+      <button type="submit"
+        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-10 rounded-full shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 flex items-center text-lg">
+        <span>Generate Invoice</span>
+        <i class="bi bi-arrow-right-short text-2xl ml-1"></i>
+      </button>
+    </div>
+  </div>
 
 </form>
 

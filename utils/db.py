@@ -56,7 +56,7 @@ def create_tables():
         VALUES (?, ?, ?)
     """, (
         "admin",
-        generate_password_hash("admin123"),
+        generate_password_hash("admin123", method="pbkdf2:sha256"),
         "admin"
     ))
 
@@ -64,6 +64,7 @@ def create_tables():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS invoices (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            invoice_number TEXT UNIQUE,
             customer_name TEXT,
             customer_gstin TEXT,
             subtotal REAL,

@@ -1,45 +1,80 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h3 class="mb-4">Manage Categories</h3>
-
-{% if error %}
-<div class="alert alert-danger">{{ error }}</div>
-{% endif %}
-
-<!-- Add Category -->
-<form method="POST" class="row g-3 mb-4">
-    <input type="hidden" name="add" value="1">
-    <div class="col-md-4">
-        <input
-            name="name"
-            class="form-control"
-            placeholder="Enter new category name"
-            required>
+<div class="max-w-4xl mx-auto">
+    <!-- HEADER -->
+    <div class="mb-8">
+        <h2 class="text-2xl font-bold text-gray-800">Manage Categories</h2>
+        <p class="text-gray-500 text-sm">Organize your products with categories</p>
     </div>
-    <div class="col-md-2">
-        <button class="btn btn-primary w-100">Add Category</button>
+
+    {% if error %}
+    <div class="bg-red-50 text-red-600 p-4 rounded-xl mb-6 border border-red-100 flex items-center shadow-sm">
+        <i class="bi bi-exclamation-circle-fill mr-2 text-lg"></i>
+        {{ error }}
     </div>
-</form>
+    {% endif %}
 
-<!-- Existing Categories -->
-<div class="card p-3 w-50">
-    <h6>Existing Categories</h6>
-    <ul class="list-group list-group-flush">
-        {% for c in categories %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-            {{ c[1] }}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
 
-            <form method="POST"
-                  onsubmit="return confirm('Are you sure you want to delete this category?');"
-                  style="margin:0;">
-                <input type="hidden" name="delete" value="1">
-                <input type="hidden" name="category_id" value="{{ c[0] }}">
-                <button class="btn btn-sm btn-danger">Delete</button>
+        <!-- ADD CATEGORY CARD -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 h-fit">
+            <h4 class="font-bold text-gray-800 mb-4 flex items-center">
+                <i class="bi bi-plus-circle-dotted mr-2 text-blue-500"></i> Add New Category
+            </h4>
+            <form method="POST" class="space-y-4">
+                <input type="hidden" name="add" value="1">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Category
+                        Name</label>
+                    <input name="name" type="text" placeholder="e.g. Electricals" required
+                        class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 py-2.5 px-4 transition-all">
+                </div>
+                <button
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg shadow-md shadow-blue-100 transition-all flex items-center justify-center">
+                    <i class="bi bi-plus-lg mr-2"></i> Add Category
+                </button>
             </form>
-        </li>
-        {% endfor %}
-    </ul>
+        </div>
+
+        <!-- EXISTING CATEGORIES CARD -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h4 class="font-bold text-gray-800">Existing Categories</h4>
+                <span class="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded-full">{{ categories|length
+                    }}</span>
+            </div>
+            <ul class="divide-y divide-gray-100 max-h-[400px] overflow-y-auto">
+                {% for c in categories %}
+                <li class="p-4 flex justify-between items-center hover:bg-gray-50 transition-colors group">
+                    <div class="flex items-center">
+                        <span
+                            class="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-sm font-bold mr-3">
+                            {{ c[1][0] }}
+                        </span>
+                        <span class="font-medium text-gray-700">{{ c[1] }}</span>
+                    </div>
+
+                    <form method="POST" onsubmit="return confirm('Are you sure you want to delete this category?');">
+                        <input type="hidden" name="delete" value="1">
+                        <input type="hidden" name="category_id" value="{{ c[0] }}">
+                        <button
+                            class="w-8 h-8 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                            title="Delete">
+                            <i class="bi bi-trash-fill"></i>
+                        </button>
+                    </form>
+                </li>
+                {% endfor %}
+                {% if not categories %}
+                <li class="p-8 text-center text-gray-400 text-sm italic">
+                    No categories found. Add one to get started.
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+
+    </div>
 </div>
 
 {% endblock %}

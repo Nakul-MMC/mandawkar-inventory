@@ -1,107 +1,83 @@
-# 🏪 Mandawkar Traders – Inventory & Billing System
+# Mandawkar Inventory Management System
 
-A **complete Inventory, Billing, and Sales Management System** built for a tile, granite, kadappa, and sanitary shop.
+A robust, Flask-based Inventory and Finance management system designed for small businesses. Tracks Stock, Sales, Purchases, Receivables, and Payables with a clean, responsive UI.
 
-This application supports **product-wise stock management, GST billing with PDF invoices, sales reports with charts, and low stock alerts**, designed for real-world shop usage.
+## Features
 
----
-
-## ✨ Features
-
-### 📦 Inventory Management
-- Add / edit / delete products
-- Category, size, type, pattern / variant support
-- Product-wise low stock threshold
-- Red highlight for low stock items
-
-### 📊 Dashboard
-- Total stock quantity
-- Total inventory value
-- Inventory-level stock summary
-- Low stock alert badge
-
-### 🧾 GST Billing
-- Generate GST invoices with:
-  - CGST / SGST enable-disable
-  - Adjustable tax percentages
-  - Discount (% or ₹)
-- Product-based billing (auto stock reduction)
-- Backdated invoice support
-- Professional PDF invoices with shop details
-
-### 🗂 Invoice History
-- View all invoices
-- Reprint / download invoice PDFs anytime
-
-### 📈 Sales Reports
-- Daily sales report
-- Monthly sales report
-- Interactive charts (Chart.js)
-- Total GST collected summary
-
-### 🔐 Authentication
-- Login system
-- Admin / Staff roles
-- Secure access to billing & deletion features
+*   **Inventory Management**: Track products, categories, types, patterns, and stock levels.
+*   **Billing & Invoicing**: Create GST-compliant invoices with automatic stock deduction.
+*   **Finance Dashboard**: Track Customer Receivables and Dealer Payables (Sorted by Pending status).
+*   **Stock In**: Record purchases from dealers, update stock, and manage payables in one flow.
+*   **PDF Generation**: Download professional Invoice PDFs.
+*   **Excel Export**: Export inventory data for reporting.
+*   **Audit Logs**: Track every action (Create, Update, Delete) in the system.
 
 ---
 
-## 🛠 Tech Stack
+## Technical Requirements
 
-- **Backend:** Python (Flask)
-- **Frontend:** HTML, Bootstrap, Jinja2
-- **Database:** SQLite (local)
-- **PDF Generation:** ReportLab
-- **Charts:** Chart.js
-- **Version Control:** Git & GitHub
+To run this application, you need:
+1.  **Python 3.8 or higher** installed on your computer.
+2.  A web browser (Chrome, Edge, Firefox).
 
 ---
 
-## 🚀 How to Run Locally (Step-by-Step)
+## Installation & Setup (For New Devices)
 
-### 1️⃣ Clone the Repository
+Follow these steps to set up the application on a new computer:
+
+### 1. Install Python
+If you haven't already, download and install Python from [python.org](https://www.python.org/downloads/).
+*   **Important**: During installation, check the box **"Add Python to PATH"**.
+
+### 2. Open the Project Folder
+Open a terminal (Command Prompt or PowerShell) and navigate to this folder.
+
+### 3. Install Dependencies
+Run the following command to install the required libraries:
 ```bash
-git clone https://github.com/Nakul-MMC/mandawkar-inventory.git
-cd mandawkar-inventory
-
-
-## ▶ How to Run
-```bash
-python -m venv venv
-venv\Scripts\activate
 pip install -r requirements.txt
-python app.py
-
-http://127.0.0.1:5000
-
-Username: admin
-Password: admin123
 ```
-### Project Structure (Simplified)
-mandawkar-inventory/
-│
-├── app.py
-├── db.sqlite3
-├── requirements.txt
-├── README.md
-│
-├── templates/
-│   ├── dashboard.html
-│   ├── inventory.html
-│   ├── create_invoice.html
-│   ├── invoice_history.html
-│   ├── sales_report.html
-│   └── base.html
-│
-├── static/
-│   ├── css/
-│   └── images/
-│
-├── utils/
-│   ├── db.py
-│   ├── export_excel.py
-│   └── invoice_pdf.py
-│
-└── invoices/
+*Note: If `pip` is not recognized, try `python -m pip install -r requirements.txt`.*
 
+### 4. Run the Application
+Start the application by running:
+```bash
+python app.py
+```
 
+### 5. Access the App
+Open your web browser and go to:
+[http://127.0.0.1:5000](http://127.0.0.1:5000)
+
+---
+
+## Default Login
+
+On the first run, the system automatically creates an Admin account:
+
+*   **Username**: `admin`
+*   **Password**: `admin123`
+
+*Please change this password or create a new user after logging in for security.*
+
+---
+
+## Data Storage & Backup
+
+*   **Where is my data?**
+    All data (Products, Invoices, Customers) is stored in a single file:
+    `instance/db.sqlite3`
+
+*   **How to Backup?**
+    Simply copy the `instance/db.sqlite3` file to a safe location (like Google Drive or a USB stick).
+
+*   **How to Restore?**
+    If you move to a new computer, install the app as per the steps above, then replace the empty `instance/db.sqlite3` with your backup copy.
+
+---
+
+## Troubleshooting
+
+*   **"No module named..." error**: Run existing `pip install -r requirements.txt` again.
+*   **Database Locked**: Ensure the app is not open in another window or terminal.

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container text-center mt-5">
+    <div class="card p-5 shadow-sm mx-auto" style="max-width: 600px;">
+        <h1 class="text-success mb-3">✅ Success!</h1>
+        <h4 class="mb-4">Bill Generated Successfully</h4>
+        <p class="text-muted">Invoice #{{ invoice_number }}</p>
+
+        <div class="d-grid gap-3">
+            <a href="{{ url_for('download_invoice', invoice_id=invoice_id) }}" class="btn btn-primary btn-lg">
+                📄 Download Invoice
+            </a>
+
+            <a href="{{ url_for('create_invoice') }}" class="btn btn-outline-secondary btn-lg">
+                ➕ Create New Bill
+            </a>
+
+            <a href="{{ url_for('dashboard') }}" class="btn btn-link text-decoration-none">
+                Go to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

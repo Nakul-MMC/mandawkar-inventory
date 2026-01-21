@@ -1,37 +1,207 @@
 {% extends "base.html" %}
 {% block content %}
 
-<h3 class="mb-3">Invoice History</h3>
-
-<div class="table-responsive">
-<table class="table table-bordered table-hover align-middle">
-    <thead class="table-dark">
-        <tr>
-            <th>Invoice No</th>
-            <th>Date</th>
-            <th>Customer</th>
-            <th>GSTIN</th>
-            <th>Total (₹)</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for i in invoices %}
-        <tr>
-            <td>{{ i[0] }}</td>
-            <td>{{ i[4][:10] }}</td>
-            <td>{{ i[1] }}</td>
-            <td>{{ i[2] or "-" }}</td>
-            <td>₹ {{ "%.2f"|format(i[3]) }}</td>
-            <td>
-                <a href="/download-invoice/{{ i[0] }}" class="btn btn-sm btn-primary">
-                    Reprint
-                </a>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<!-- HEADER -->
+<div class="mb-6">
+    <h2 class="text-2xl font-bold text-gray-800">Invoice History</h2>
+    <p class="text-gray-500 text-sm">View and manage past transactions</p>
 </div>
+
+<!-- INVOICE TABLE -->
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead class="bg-gray-50 border-b border-gray-200">
+                <tr class="text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                    <th class="py-4 px-6">Invoice #</th>
+                    <th class="py-4 px-6">Date</th>
+                    <th class="py-4 px-6">Customer</th>
+                    <th class="py-4 px-6">GSTIN</th>
+                    <th class="py-4 px-6 text-right">Total (₹)</th>
+                    <th class="py-4 px-6 text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for i in invoices %}
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="py-4 px-6 font-medium text-blue-600">
+                        {{ i[1] }}
+                    </td>
+                    <td class="py-4 px-6 text-sm text-gray-600">
+                        {{ i[5][:10] }}
+                    </td>
+                    <td class="py-4 px-6 font-medium text-gray-800">
+                        {{ i[2] }}
+                    </td>
+                    <td class="py-4 px-6 text-sm text-gray-500 font-mono">
+                        {{ i[3] or "-" }}
+                    </td>
+                    <td class="py-4 px-6 text-right font-bold text-gray-800">
+                        ₹ {{ "{:,.2f}".format(i[4]) }}
+                    </td>
+                    <td class="py-4 px-6 text-center space-x-2">
+                        <!-- Preview Button -->
+                        <button onclick="openPreview('{{ i[0] }}')"
+                            class="inline-flex items-center px-3 py-1.5 border border-gray-200 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors shadow-sm">
+                            <i class="bi bi-eye-fill mr-1"></i> View
+                        </button>
+
+                        <!-- Download Button -->
+                        <a href="/download-invoice/{{ i[0] }}"
+                            class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                            <i class="bi bi-printer-fill mr-1"></i> Reprint
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- PREVIEW MODAL -->
+<div id="previewModal"
+    class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm">
+    <div
+        class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl m-4 transform transition-all flex flex-col max-h-[90vh]">
+
+        <!-- Modal Header -->
+        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-2xl">
+            <div>
+                <h3 class="text-lg font-bold text-gray-800 flex items-center">
+                    <i class="bi bi-receipt text-blue-600 mr-2"></i>
+                    <span id="p_invoice_number">Loading...</span>
+                </h3>
+                <p class="text-xs text-gray-500" id="p_date">Loading...</p>
+            </div>
+            <button onclick="closePreview()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <i class="bi bi-x-lg text-lg"></i>
+            </button>
+        </div>
+
+        <!-- Modal Body (Scrollable) -->
+        <div class="p-6 overflow-y-auto">
+            <!-- Customer Info -->
+            <div class="grid grid-cols-2 gap-4 mb-6 bg-blue-50 p-4 rounded-xl border border-blue-100">
+                <div>
+                    <span class="block text-xs font-bold text-gray-500 uppercase">Customer</span>
+                    <span class="block font-bold text-gray-800 text-lg" id="p_customer"></span>
+                </div>
+                <div class="text-right">
+                    <span class="block text-xs font-bold text-gray-500 uppercase">GSTIN</span>
+                    <span class="block font-mono text-gray-700" id="p_gstin"></span>
+                </div>
+            </div>
+
+            <!-- Items Table -->
+            <table class="w-full text-sm mb-6">
+                <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+                    <tr>
+                        <th class="py-2 px-3 text-left rounded-l-lg">Item</th>
+                        <th class="py-2 px-3 text-center">Qty</th>
+                        <th class="py-2 px-3 text-right">Price</th>
+                        <th class="py-2 px-3 text-right rounded-r-lg">Total</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100" id="p_items">
+                    <!-- JS will populate -->
+                </tbody>
+            </table>
+
+            <!-- Totals -->
+            <div class="border-t border-gray-100 pt-4 space-y-2">
+                <div class="flex justify-between text-gray-600 text-sm">
+                    <span>Subtotal</span>
+                    <span id="p_subtotal">₹ 0.00</span>
+                </div>
+                <div class="flex justify-between text-gray-600 text-sm">
+                    <span>Tax</span>
+                    <span id="p_tax">₹ 0.00</span>
+                </div>
+                <div class="flex justify-between text-emerald-600 text-sm font-medium" id="p_discount_row">
+                    <span>Discount</span>
+                    <span id="p_discount">- ₹ 0.00</span>
+                </div>
+                <div
+                    class="flex justify-between text-2xl font-bold text-gray-900 pt-2 border-t border-dashed border-gray-200">
+                    <span>Grand Total</span>
+                    <span id="p_total">₹ 0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex justify-end gap-3">
+            <button onclick="closePreview()"
+                class="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-100 font-medium text-sm transition-colors">
+                Close
+            </button>
+            <a id="p_download_btn" href="#"
+                class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm shadow-sm transition-colors flex items-center">
+                <i class="bi bi-printer-fill mr-2"></i> Print / Download
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function openPreview(invoiceId) {
+        const modal = document.getElementById('previewModal');
+        modal.classList.remove('hidden');
+
+        // Reset Logic
+        document.getElementById('p_invoice_number').innerText = 'Loading...';
+        document.getElementById('p_items').innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-400">Loading details...</td></tr>';
+
+        try {
+            const res = await fetch(`/api/invoice/${invoiceId}`);
+            const data = await res.json();
+
+            document.getElementById('p_invoice_number').innerText = data.invoice_number;
+            document.getElementById('p_date').innerText = new Date(data.date).toLocaleString();
+            document.getElementById('p_customer').innerText = data.customer_name;
+            document.getElementById('p_gstin').innerText = data.customer_gstin || 'N/A';
+
+            // Items
+            let itemsHtml = '';
+            data.items.forEach(item => {
+                itemsHtml += `
+                    <tr>
+                        <td class="py-2 px-3">${item.description}</td>
+                        <td class="py-2 px-3 text-center text-gray-500">${item.quantity}</td>
+                        <td class="py-2 px-3 text-right text-gray-500">₹${item.price.toFixed(2)}</td>
+                        <td class="py-2 px-3 text-right font-medium text-gray-800">₹${item.total.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+            document.getElementById('p_items').innerHTML = itemsHtml;
+
+            // Totals
+            document.getElementById('p_subtotal').innerText = '₹ ' + data.subtotal.toFixed(2);
+            document.getElementById('p_tax').innerText = '₹ ' + data.tax_amount.toFixed(2);
+            document.getElementById('p_discount').innerText = '- ₹ ' + data.discount.toFixed(2);
+            document.getElementById('p_total').innerText = '₹ ' + data.total.toFixed(2);
+
+            // Show/Hide Discount Row
+            const discountRow = document.getElementById('p_discount_row');
+            if (data.discount > 0) {
+                discountRow.classList.remove('hidden');
+            } else {
+                discountRow.classList.add('hidden');
+            }
+
+            // Print Link
+            document.getElementById('p_download_btn').href = `/download-invoice/${data.id}`;
+
+        } catch (e) {
+            alert("Error fetching preview: " + e);
+            closePreview();
+        }
+    }
+
+    function closePreview() {
+        document.getElementById('previewModal').classList.add('hidden');
+    }
+</script>
 
 {% endblock %}

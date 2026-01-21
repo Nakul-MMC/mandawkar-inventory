@@ -14,8 +14,7 @@ def export_inventory_to_excel():
             pattern,
             quantity,
             price,
-            quantity * price AS total_value,
-            last_updated
+            (quantity * price) AS total_value
         FROM products
     """
     df = pd.read_sql_query(query, conn)

@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div x-data="{ search: '' }">
+
+    <!-- HEADER & ACTIONS -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-800">Stock In (Purchase)</h2>
+            <p class="text-gray-500 text-sm">Select Dealer and Add Stock quantities.</p>
+        </div>
+        <div class="flex flex-1 w-full md:w-auto justify-end items-center gap-3">
+            <!-- Search -->
+            <div class="relative w-full md:w-64">
+                <input type="text" x-model="search" placeholder="Search Products..."
+                    class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl shadow-sm focus:ring-purple-500 focus:border-purple-500 transition-all">
+                <i class="bi bi-search absolute left-3 top-3 text-gray-400"></i>
+            </div>
+
+            <!-- Add New Product Button -->
+            <button @click="document.getElementById('newProductModal').classList.remove('hidden')"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl shadow-md flex items-center whitespace-nowrap transition-colors">
+                <i class="bi bi-plus-lg mr-2"></i> New Product
+            </button>
+        </div>
+    </div>
+
+    <form method="POST" action="/record-purchase" id="purchaseForm">
+
+        <!-- DEALER & PAYMENT INFO (Card) -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <!-- Dealer -->
+                <div class="col-span-1">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Dealer</label>
+                    <input type="text" name="dealer_name" list="dealerList" required placeholder="Select Dealer"
+                        class="w-full bg-gray-50 border-gray-200 rounded-lg focus:bg-white focus:ring-purple-500 py-2 px-3">
+                    <datalist id="dealerList">
+                        {% for d in dealers %}
+                        <option value="{{ d.name }}"></option>
+                        {% endfor %}
+                    </datalist>
+                </div>
+                <!-- Invoice -->
+                <div class="col-span-1">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Bill No</label>
+                    <input type="text" name="invoice_number" placeholder="Bill No."
+                        class="w-full bg-gray-50 border-gray-200 rounded-lg focus:bg-white focus:ring-purple-500 py-2 px-3">
+                </div>
+                <!-- Date -->
+                <div class="col-span-1">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
+                    <input type="date" name="date" value="{{ today }}" required
+                        class="w-full bg-gray-50 border-gray-200 rounded-lg focus:bg-white focus:ring-purple-500 py-2 px-3">
+                </div>
+                <!-- Paid Amount -->
+                <div class="col-span-1">
+                    <label class="block text-xs font-bold text-emerald-600 uppercase mb-1">Paid Amount (₹)</label>
+                    <input type="number" name="paid_amount" step="0.01" value="0"
+                        class="w-full border-emerald-300 ring-1 ring-emerald-100 rounded-lg focus:ring-emerald-500 py-2 px-3 text-emerald-800 font-bold">
+                </div>
+            </div>
+        </div>
+
+        <!-- PRODUCT LIST (Table View) -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-24">
+            <table class="w-full text-left border-collapse">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr class="text-xs font-bold text-gray-500 uppercase">
+                        <th class="py-3 px-4">Product Details</th>
+                        <th class="py-3 px-4 text-center">Category</th>
+                        <th class="py-3 px-4 text-center">Current Stock</th>
+                        <th class="py-3 px-4 w-32">Cost Price</th>
+                        <th class="py-3 px-4 w-32">Add Qty</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for p in products %}
+                    {% set search_str = (p.category ~ ' ' ~ p.size ~ ' ' ~ p.type ~ ' ' ~ p.variant ~ ' ' ~
+                    p.pattern)|lower %}
+                    <tr class="hover:bg-gray-50 transition-colors"
+                        x-show="search === '' || '{{ search_str }}'.includes(search.toLowerCase())">
+
+                        <!-- Product Info -->
+                        <td class="py-3 px-4">
+                            <h4 class="font-bold text-gray-800 text-sm">{{ p.size }}</h4>
+                            <p class="text-xs text-gray-500">
+                                {{ p.pattern }} • {{ p.type }}
+                                {% if p.variant %} • {{ p.variant }}{% endif %}
+                            </p>
+                        </td>
+
+                        <!-- Category -->
+                        <td class="py-3 px-4 text-center">
+                            <span class="text-xs font-medium px-2 py-1 rounded bg-gray-100 text-gray-600 uppercase">
+                                {{ p.category }}
+                            </span>
+                        </td>
+
+                        <!-- Stock -->
+                        <td class="py-3 px-4 text-center">
+                            <span class="text-sm font-bold text-gray-700">{{ p.quantity }}</span>
+                        </td>
+
+                        <!-- Inputs -->
+                        <td class="py-3 px-4">
+                            <input type="number" name="cost_{{ p.id }}" placeholder="0" step="0.01"
+                                value="{{ p.price }}"
+                                class="w-full text-sm border-gray-200 rounded-lg py-1.5 px-2 focus:ring-2 focus:ring-purple-500">
+                        </td>
+                        <td class="py-3 px-4">
+                            <input type="number" name="qty_{{ p.id }}" placeholder="0" min="0"
+                                oninput="this.value > 0 ? this.classList.add('bg-purple-50', 'border-purple-300') : this.classList.remove('bg-purple-50', 'border-purple-300')"
+                                class="w-full text-sm border-gray-200 rounded-lg py-1.5 px-2 focus:ring-2 focus:ring-purple-500 font-bold text-purple-700 transition-colors">
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Empty State for Search -->
+            <div x-show="document.querySelectorAll('tbody tr[x-show]:not([style*=\'display: none\'])').length === 0"
+                class="p-8 text-center text-gray-400 hidden" :class="{ 'block': true, 'hidden': false }">
+                No products found matching "<span x-text="search"></span>"
+            </div>
+        </div>
+
+        <!-- FLOATING SUBMIT BUTTON -->
+        <div class="fixed bottom-6 right-6 z-10">
+            <button type="submit"
+                class="bg-gray-900 hover:bg-black text-white px-8 py-4 rounded-full shadow-2xl flex items-center font-bold text-lg transition-transform hover:scale-105 border-4 border-white-100">
+                <i class="bi bi-save2-fill mr-3"></i> Save Purchase
+            </button>
+        </div>
+
+    </form>
+
+
+    <!-- NEW PRODUCT MODAL (Matches Add Product Tab) -->
+    <div id="newProductModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl m-4 transform transition-all">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800">Add New Product</h3>
+                <button onclick="document.getElementById('newProductModal').classList.add('hidden')"
+                    class="text-gray-400 hover:text-gray-600 p-2">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <form id="quickAddForm">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Category -->
+                    <div class="col-span-1 md:col-span-2">
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Category</label>
+                        <select id="np_category" class="w-full border-gray-300 rounded-lg text-sm bg-gray-50">
+                            {% for c in categories %}
+                            <option value="{{ c }}">{{ c }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Size -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Size</label>
+                        <input type="text" id="np_size" placeholder="e.g. 600x600" required
+                            class="w-full border-gray-300 rounded-lg text-sm">
+                    </div>
+
+                    <!-- Type -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Type</label>
+                        <input type="text" id="np_type" placeholder="e.g. Ceramic"
+                            class="w-full border-gray-300 rounded-lg text-sm">
+                    </div>
+
+                    <!-- Variant -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Variant</label>
+                        <input type="text" id="np_variant" placeholder="e.g. Glossy"
+                            class="w-full border-gray-300 rounded-lg text-sm">
+                    </div>
+
+                    <!-- Pattern -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Pattern</label>
+                        <input type="text" id="np_pattern" placeholder="e.g. Marble"
+                            class="w-full border-gray-300 rounded-lg text-sm">
+                    </div>
+
+                    <!-- Price -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Price (₹)</label>
+                        <input type="number" id="np_price" placeholder="0.00"
+                            class="w-full border-gray-300 rounded-lg text-sm">
+                    </div>
+
+                    <!-- Low Stock -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Low Stock Alert</label>
+                        <input type="number" id="np_threshold" value="10"
+                            class="w-full border-gray-300 rounded-lg text-sm">
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 mt-8">
+                    <button type="button" onclick="document.getElementById('newProductModal').classList.add('hidden')"
+                        class="px-5 py-2.5 rounded-xl text-gray-500 hover:bg-gray-100 font-medium">Cancel</button>
+                    <button type="button" onclick="saveNewProduct()"
+                        class="px-5 py-2.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 font-medium shadow-md flex items-center">
+                        <i class="bi bi-plus-lg mr-2"></i> Save & Reload
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    async function saveNewProduct() {
+        const data = {
+            category: document.getElementById('np_category').value,
+            size: document.getElementById('np_size').value,
+            type: document.getElementById('np_type').value,
+            variant: document.getElementById('np_variant').value,
+            pattern: document.getElementById('np_pattern').value,
+            price: document.getElementById('np_price').value,
+            threshold: document.getElementById('np_threshold').value
+        };
+
+        try {
+            const response = await fetch('/api/quick-add-product', {
+                method: 'POST',
+                body: JSON.stringify(data),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                window.location.reload();
+            } else {
+                alert("Error: " + result.error);
+            }
+        } catch (e) {
+            alert("Network Error: " + e);
+        }
+    }
+</script>
+
+{% endblock %}
