@@ -5,14 +5,22 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.units import inch
 import sqlite3
 import os
+from flask import current_app
 
-DB_NAME = os.path.join(os.getcwd(), "instance", "db.sqlite3")
+import sys
 
 def generate_invoice_pdf(invoice_id):
-    if not os.path.exists("invoices"):
-        os.mkdir("invoices")
+    # Determine base directory
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        base_dir = os.getcwd()
+        
+    output_dir = os.path.join(base_dir, "invoices")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    filename = f"invoices/invoice_{invoice_id}.pdf"
+    filename = os.path.join(output_dir, f"invoice_{invoice_id}.pdf")
     doc = SimpleDocTemplate(filename, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=18)
     elements = []
     
@@ -20,8 +28,30 @@ def generate_invoice_pdf(invoice_id):
     title_style = styles['Heading1']
     normal_style = styles['Normal']
     
+    # ---------------- DATABASE PATH ----------------
+    # ---------------- DATABASE PATH ----------------
+    # Extract path from SQLAlchemy URI (sqlite:///path)
+    db_uri = current_app.config['SQLALCHEMY_DATABASE_URI']
+    if db_uri.startswith('sqlite:///'):
+        db_path = db_uri.replace('sqlite:///', '')
+        
+        # If relative path, resolve to absolute
+        if not os.path.isabs(db_path):
+             db_path = os.path.join(current_app.root_path, db_path)
+    else:
+        # Fallback for when URI might not be set or non-sqlite
+        db_path = os.path.join(current_app.root_path, "instance", "db.sqlite3")
+        
+    print(f"DEBUG: PDF Generator using DB at: {db_path}") # Debug log
+    if not os.path.exists(db_path):
+        # Fallback: maybe it's in root?
+        root_db = os.path.join(current_app.root_path, "db.sqlite3")
+        if os.path.exists(root_db):
+            db_path = root_db
+ 
+
     # ---------------- DATA FETCHING ----------------
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Invoice Header

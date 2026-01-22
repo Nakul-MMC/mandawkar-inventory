@@ -2,9 +2,16 @@
 {% block content %}
 
 <!-- HEADER -->
-<div class="mb-6">
-    <h2 class="text-2xl font-bold text-gray-800">Invoice History</h2>
-    <p class="text-gray-500 text-sm">View and manage past transactions</p>
+<div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div>
+        <h2 class="text-2xl font-bold text-gray-800">Invoice History</h2>
+        <p class="text-gray-500 text-sm">View and manage past transactions</p>
+    </div>
+    <div class="w-full md:w-64 relative">
+        <input type="text" id="historySearch" onkeyup="filterHistory()" placeholder="Search Customer or Invoice..."
+            class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 transition-colors shadow-sm">
+        <i class="bi bi-search absolute left-3 top-2.5 text-gray-400 text-xs"></i>
+    </div>
 </div>
 
 <!-- INVOICE TABLE -->
@@ -16,44 +23,45 @@
                     <th class="py-4 px-6">Invoice #</th>
                     <th class="py-4 px-6">Date</th>
                     <th class="py-4 px-6">Customer</th>
-                    <th class="py-4 px-6">GSTIN</th>
                     <th class="py-4 px-6 text-right">Total (₹)</th>
                     <th class="py-4 px-6 text-center">Actions</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
-                {% for i in invoices %}
-                <tr class="hover:bg-gray-50 transition-colors">
-                    <td class="py-4 px-6 font-medium text-blue-600">
-                        {{ i[1] }}
+                {% if not invoices %}
+                <tr>
+                    <td colspan="5" class="text-center py-8 text-gray-400">
+                        <i class="bi bi-inbox text-4xl mb-2 block"></i>
+                        No invoices found.
                     </td>
-                    <td class="py-4 px-6 text-sm text-gray-600">
-                        {{ i[5][:10] }}
+                </tr>
+                {% else %}
+                {% for inv in invoices %}
+                <tr class="hover:bg-gray-50 transition-colors group">
+                    <td class="py-4 px-6 font-mono text-sm text-gray-600 font-bold group-hover:text-blue-600">{{
+                        inv.invoice_number }}</td>
+                    <td class="py-4 px-6 text-sm text-gray-600">{{ inv.created_at }}</td>
+                    <td class="py-4 px-6 text-sm text-gray-800 font-medium">{{ inv.customer.name if inv.customer else
+                        inv.customer_name }}</td>
+                    <td class="py-4 px-6 text-right font-bold text-gray-800">₹ {{ "{:,.2f}".format(inv.total or 0) }}
                     </td>
-                    <td class="py-4 px-6 font-medium text-gray-800">
-                        {{ i[2] }}
-                    </td>
-                    <td class="py-4 px-6 text-sm text-gray-500 font-mono">
-                        {{ i[3] or "-" }}
-                    </td>
-                    <td class="py-4 px-6 text-right font-bold text-gray-800">
-                        ₹ {{ "{:,.2f}".format(i[4]) }}
-                    </td>
-                    <td class="py-4 px-6 text-center space-x-2">
-                        <!-- Preview Button -->
-                        <button onclick="openPreview('{{ i[0] }}')"
-                            class="inline-flex items-center px-3 py-1.5 border border-gray-200 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors shadow-sm">
-                            <i class="bi bi-eye-fill mr-1"></i> View
-                        </button>
-
-                        <!-- Download Button -->
-                        <a href="/download-invoice/{{ i[0] }}"
-                            class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                            <i class="bi bi-printer-fill mr-1"></i> Reprint
-                        </a>
+                    <td class="py-4 px-6 text-center">
+                        <div class="flex items-center justify-center space-x-2">
+                            <a href="/download-invoice/{{ inv.id }}"
+                                class="text-gray-400 hover:text-blue-600 p-1 rounded-lg transition-colors"
+                                title="Download PDF">
+                                <i class="bi bi-file-earmark-pdf"></i>
+                            </a>
+                            <button onclick="openPreview({{ inv.id }})"
+                                class="text-gray-400 hover:text-purple-600 p-1 rounded-lg transition-colors"
+                                title="Preview">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
+                {% endif %}
             </tbody>
         </table>
     </div>
@@ -201,6 +209,26 @@
 
     function closePreview() {
         document.getElementById('previewModal').classList.add('hidden');
+    }
+
+    function filterHistory() {
+        const input = document.getElementById('historySearch');
+        const filter = input.value.toLowerCase();
+        const tbody = document.querySelector('table tbody');
+        const rows = tbody.getElementsByTagName('tr');
+
+        for (let i = 0; i < rows.length; i++) {
+            if (rows[i].querySelector('td[colspan]')) continue;
+
+            const invNum = rows[i].getElementsByTagName('td')[0]?.textContent || "";
+            const custName = rows[i].getElementsByTagName('td')[2]?.textContent || "";
+
+            if (invNum.toLowerCase().includes(filter) || custName.toLowerCase().includes(filter)) {
+                rows[i].style.display = "";
+            } else {
+                rows[i].style.display = "none";
+            }
+        }
     }
 </script>
 

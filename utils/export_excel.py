@@ -1,10 +1,10 @@
 import pandas as pd
 from datetime import datetime
-from utils.db import get_connection
+from models import db # Import shared db instance
 import os
 
 def export_inventory_to_excel():
-    conn = get_connection()
+    # Use SQLAlchemy Engine directly
     query = """
         SELECT
             category,
@@ -17,15 +17,21 @@ def export_inventory_to_excel():
             (quantity * price) AS total_value
         FROM products
     """
-    df = pd.read_sql_query(query, conn)
-    conn.close()
+    df = pd.read_sql_query(query, db.engine.connect()) # .connect() for SQLAlchemy 2.0 safety
 
     df["exported_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    if not os.path.exists("exports"):
-        os.mkdir("exports")
+    import sys
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        base_dir = os.getcwd()
+        
+    output_dir = os.path.join(base_dir, "exports")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    filename = f"exports/inventory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    df.to_excel(filename, index=False)
-
-    return filename
+    filepath = os.path.join(output_dir, f"inventory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
+    df.to_excel(filepath, index=False)
+    
+    return filepath

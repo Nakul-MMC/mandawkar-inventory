@@ -10,14 +10,28 @@ import os
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "mandawkar-secret-key")  # required for sessions
 
-from models import db, User, Product, Category, Invoice, InvoiceItem, AuditLog
+from models import db, User, Product, Category, Invoice, InvoiceItem, AuditLog, Customer, Dealer, Purchase, PurchaseItem, Payment
 import os
+import time
+import pandas as pd
 
 # app = Flask(__name__) ALREADY DEFINED ABOVE
+import sys
+
 # Database Configuration
-# In production, we use the DATABASE_URL environment variable.
-# In development, we fallback to local SQLite.
-db_url = os.environ.get('DATABASE_URL', 'sqlite:///db.sqlite3')
+if getattr(sys, 'frozen', False):
+    # EXE MODE: Store DB next to executable (in 'data' folder)
+    base_dir = os.path.dirname(sys.executable)
+    data_dir = os.path.join(base_dir, 'data')
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    db_path = os.path.join(data_dir, 'db.sqlite3')
+    db_url = f'sqlite:///{db_path}'
+else:
+    # DEV MODE: Use local instance folder
+    db_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'instance', 'db.sqlite3')
+    db_url = os.environ.get('DATABASE_URL', f'sqlite:///{db_path}')
+
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1) # Fix for Render/Heroku
 
@@ -118,8 +132,13 @@ def dashboard():
             p.threshold
         ])
 
-    # Low Stock Count
-    low_stock_count = Product.query.filter(Product.is_active==True, Product.quantity <= Product.threshold).count()
+    # Low Stock Count (Exclude Opening Balance)
+    low_stock_count = Product.query.filter(
+        Product.is_active == True, 
+        Product.quantity <= Product.threshold,
+        Product.type != 'Opening Balance',
+        Product.category != 'Opening Balance'
+    ).count()
 
     return render_template(
         "dashboard.html",
@@ -213,7 +232,11 @@ def add_product():
 def inventory():
     category = request.args.get("category")
 
-    query = Product.query.filter(Product.is_active==True)
+    query = Product.query.filter(
+        Product.is_active == True,
+        Product.category != 'Opening Balance',
+        Product.type != 'Opening Balance'
+    )
     if category:
         query = query.filter(Product.category == category)
     
@@ -344,17 +367,60 @@ def create_invoice():
                 return "No items selected", 400
 
             # 2. Totals Calculation
-            discount_input = float(request.form["discount"])
-            discount = subtotal * discount_input / 100 if discount_input <= 100 else discount_input
-            taxable_value = subtotal - discount
+            # Parse Variables
+            discount_val = float(request.form.get("discount") or 0)
+            discount_type = request.form.get("discount_type", "amount")
+            
+            # Tax Logic
+            cgst_percent = float(request.form.get("cgst_percent") or 0) if "enable_cgst" in request.form else 0
+            sgst_percent = float(request.form.get("sgst_percent") or 0) if "enable_sgst" in request.form else 0
 
-            enable_cgst = "enable_cgst" in request.form
-            enable_sgst = "enable_sgst" in request.form
-            cgst_percent = float(request.form["cgst_percent"]) if enable_cgst else 0
-            sgst_percent = float(request.form["sgst_percent"]) if enable_sgst else 0
+            # Calculate Items
+            items = []
+            subtotal = 0
+            
+            # Parse Items from Form (Inputs named qty_{id}, price_{id})
+            # Iterate through all keys to find qty_
+            for key in request.form:
+                if key.startswith("qty_"):
+                    qty_str = request.form[key]
+                    if qty_str and float(qty_str) > 0:
+                        p_id = int(key.split("_")[1])
+                        qty = float(qty_str)
+                        
+                        # Get Price input for this ID
+                        price_key = f"price_{p_id}"
+                        price_str = request.form.get(price_key)
+                        price = float(price_str) if price_str else 0 # Fallback 0 if empty
+                        
+                        line_total = qty * price
+                        subtotal += line_total
+                        
+                        p = Product.query.get(p_id)
+                        items.append({
+                            "product": p,
+                            "quantity": qty,
+                            "price": price, # Use overridden price
+                            "total": line_total,
+                            "description": f"{p.category} {p.size} {p.type}"
+                        })
 
-            cgst_amount = taxable_value * cgst_percent / 100
-            sgst_amount = taxable_value * sgst_percent / 100
+            if not items:
+                return "Error: No items selected.", 400
+
+            # Backend Calculations (Trust but Verify)
+            # Discount
+            discount_amount = 0
+            if discount_type == 'percent':
+                discount_amount = subtotal * (discount_val / 100)
+            else:
+                discount_amount = discount_val
+                
+            taxable_value = max(0, subtotal - discount_amount)
+            
+            cgst_amount = taxable_value * (cgst_percent / 100)
+            sgst_amount = taxable_value * (sgst_percent / 100)
+            
             total = taxable_value + cgst_amount + sgst_amount
 
             # 3. Execution Phase (Atomic Transaction)
@@ -363,22 +429,31 @@ def create_invoice():
             # Find or Create Customer
             customer_name_input = request.form["customer_name"].strip()
             customer_obj = Customer.query.filter_by(name=customer_name_input).first()
+            customer_phone = request.form.get("customer_phone", "N/A")
+            customer_gstin = request.form["customer_gstin"]
+
             if not customer_obj:
                 customer_obj = Customer(
                     name=customer_name_input, 
-                    gstin=request.form["customer_gstin"],
-                    phone="N/A", # Optional, can improve frontend to capture this
+                    gstin=customer_gstin,
+                    phone=customer_phone, 
                     address="Created via Invoice"
                 )
                 db.session.add(customer_obj)
                 db.session.flush() # Get ID
+            else:
+                # Update GST/Phone if provided and missing/different
+                if customer_gstin and not customer_obj.gstin:
+                    customer_obj.gstin = customer_gstin
+                if customer_phone and customer_phone != "N/A":
+                    customer_obj.phone = customer_phone
             
             new_invoice = Invoice(
                 invoice_number=invoice_number,
                 customer_name=customer_name_input,
                 customer_gstin=request.form["customer_gstin"],
                 subtotal=subtotal,
-                discount=discount,
+                discount=discount_amount,
                 cgst_percent=cgst_percent,
                 cgst_amount=cgst_amount,
                 sgst_percent=sgst_percent,
@@ -441,25 +516,7 @@ def create_invoice():
 
 
 
-@app.route("/invoices")
-@login_required("admin")
-def invoice_history():
-    invoices_obj = Invoice.query.filter_by(is_active=True).order_by(Invoice.created_at.desc()).all()
-    
-    # Map to tuples for template (match expected list format)
-    # [id, invoice_number, customer_name, customer_gstin, total, created_at]
-    invoices = []
-    for i in invoices_obj:
-        invoices.append((
-            i.id,
-            i.invoice_number,
-            i.customer_name,
-            i.customer_gstin,
-            i.total,
-            i.created_at
-        ))
 
-    return render_template("invoice_history.html", invoices=invoices)
 
 
 @app.route("/api/invoice/<int:invoice_id>")
@@ -551,7 +608,7 @@ def finance():
         paid_sum = sum(i.paid_amount for i in invoices)
         due = bill_sum - paid_sum
         
-        if bill_sum > 0: # Only show active customers
+        if True: # Show ALL customers, even with 0 balance
             receivables.append({
                 "id": c.id,
                 "name": c.name,
@@ -576,7 +633,7 @@ def finance():
         paid_sum = sum(p.paid_amount for p in purchases)
         due = buy_sum - paid_sum
         
-        if buy_sum > 0:
+        if True: # Show ALL dealers
             payables.append({
                 "id": d.id,
                 "name": d.name,
@@ -608,6 +665,13 @@ def finance():
         today=datetime.now().strftime("%Y-%m-%d")
     )
 
+@app.route("/invoices")
+@login_required()
+def invoices():
+    # Show ALL active invoices descending
+    all_invoices = Invoice.query.filter_by(is_active=True).order_by(Invoice.created_at.desc()).all()
+    return render_template("invoice_history.html", invoices=all_invoices)
+
 @app.route("/api/add-customer", methods=["POST"])
 @login_required("admin")
 def add_customer():
@@ -617,11 +681,63 @@ def add_customer():
         gstin = request.form.get("gstin", "")
         address = request.form.get("address", "")
         
-        if Customer.query.filter_by(name=name).first():
-            return "Customer already exists", 400
+        # 1. Check if customer exists
+        new_c = Customer.query.filter_by(name=name).first()
+        
+        if not new_c:
+            # Create New
+            new_c = Customer(name=name, phone=phone, gstin=gstin, address=address)
+            db.session.add(new_c)
+            db.session.flush() # Get ID
+        else:
+            # Update existing details if provided (optional, but good UX)
+            if phone: new_c.phone = phone
+            if gstin: new_c.gstin = gstin
+            if address: new_c.address = address
+            # No flush needed as ID exists, but valid object
+
+        # 2. Handle Opening Balance (Add as new Invoice)
+        opening_balance = float(request.form.get("opening_balance", 0))
+        opening_desc = request.form.get("opening_desc", "Opening Balance").strip() or "Opening Balance"
+        
+        if opening_balance > 0:
+            # Find/Create 'Service' Product
+            svc_prod = Product.query.filter_by(category="Service", type="Opening Balance").first()
+            if not svc_prod:
+                svc_prod = Product(category="Service", size="NA", type="Opening Balance", variant="-", pattern="-", quantity=0, price=0, is_active=True)
+                db.session.add(svc_prod)
+                db.session.flush()
+
+            # Create Invoice
+            inv = Invoice(
+                invoice_number=f"OPEN-BAL-{uuid.uuid4().hex[:8].upper()}", # Unique ID using timestamp
+                customer_id=new_c.id,
+                customer_name=new_c.name,
+                customer_gstin=new_c.gstin,
+                total=opening_balance,
+                subtotal=opening_balance,
+                taxable_value=opening_balance,
+                cgst_percent=0, cgst_amount=0,
+                sgst_percent=0, sgst_amount=0,
+                discount=0,
+                status="Pending",
+                paid_amount=0,
+                created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            )
+            db.session.add(inv)
+            db.session.flush()
             
-        new_c = Customer(name=name, phone=phone, gstin=gstin, address=address)
-        db.session.add(new_c)
+            # Create Invoice Item
+            inv_item = InvoiceItem(
+                invoice_id=inv.id,
+                product_id=svc_prod.id,
+                product_name=opening_desc,
+                quantity=1,
+                price=opening_balance,
+                total=opening_balance
+            )
+            db.session.add(inv_item)
+
         db.session.commit()
         return redirect(url_for("finance"))
     except Exception as e:
@@ -635,13 +751,52 @@ def add_dealer():
         phone = request.form.get("phone", "")
         gstin = request.form.get("gstin", "")
         
-        if Dealer.query.filter_by(name=name).first():
-            return "Dealer already exists", 400
-            
-        new_d = Dealer(name=name, phone=phone, gstin=gstin)
-        db.session.add(new_d)
+        # 1. Upsert Dealer
+        new_d = Dealer.query.filter_by(name=name).first()
+        if not new_d:
+            new_d = Dealer(name=name, phone=phone, gstin=gstin)
+            db.session.add(new_d)
+            db.session.flush()
+        else:
+            if phone: new_d.phone = phone
+            if gstin: new_d.gstin = gstin
+
+        # 2. Handle Opening Balance
+        opening_balance = float(request.form.get("opening_balance", 0))
+        opening_desc = request.form.get("opening_desc", "Opening Balance").strip() or "Opening Balance"
+        
+        if opening_balance > 0:
+            # Find/Create Service Product
+            svc_prod = Product.query.filter_by(category="Service", type="Opening Balance").first()
+            if not svc_prod:
+                svc_prod = Product(category="Service", size="NA", type="Opening Balance", variant="-", pattern="-", quantity=0, price=0, is_active=True)
+                db.session.add(svc_prod)
+                db.session.flush()
+
+            # Create Purchase
+            pur = Purchase(
+                dealer_id=new_d.id,
+                total_amount=opening_balance,
+                paid_amount=0,
+                status="Pending",
+                date=datetime.now().strftime("%Y-%m-%d")
+            )
+            db.session.add(pur)
+            db.session.flush()
+
+            # Create Purchase Item
+            pur_item = PurchaseItem(
+                purchase_id=pur.id,
+                product_id=svc_prod.id,
+                product_name=opening_desc,
+                quantity=1,
+                cost_price=opening_balance,
+                total_amount=opening_balance
+            )
+            db.session.add(pur_item)
+
         db.session.commit()
-        return redirect(url_for("finance"))
+        return redirect(url_for("finance", tab="payables"))
     except Exception as e:
         return f"Error: {e}", 500
 
@@ -665,7 +820,109 @@ def record_payment():
     except Exception as e:
         return f"Error recording payment: {e}", 500
 
-@app.route("/record-purchase", methods=["GET", "POST"])
+@app.route("/api/party-history/<type_>/<int:id_>")
+@login_required("admin")
+def party_history(type_, id_):
+    try:
+        data = []
+        if type_ == 'Customer':
+            invoices = Invoice.query.filter_by(customer_id=id_, is_active=True).order_by(Invoice.created_at.desc()).all()
+            print(f"DEBUG: Found {len(invoices)} invoices for Customer {id_}")
+            for inv in invoices:
+                items_desc = ", ".join([i.product_name for i in inv.items[:3]])
+                if len(inv.items) > 3: items_desc += "..."
+                
+                # Debug Date
+                # print(f"DEBUG: Invoice {inv.id} Date: {inv.created_at} Type: {type(inv.created_at)}")
+
+                data.append({
+                    "id": inv.id,
+                    "date": inv.created_at, 
+                    "number": inv.invoice_number,
+                    "total": inv.total,
+                    "paid": inv.paid_amount,
+                    "status": inv.status,
+                    "desc": items_desc or "No Items"
+                })
+        elif type_ == 'Dealer':
+            purchases = Purchase.query.filter_by(dealer_id=id_).order_by(Purchase.created_at.desc()).all()
+            for pur in purchases:
+                # Purchase items
+                items_desc = ", ".join([i.product_name for i in pur.items[:3]])
+                if len(pur.items) > 3: items_desc += "..."
+
+                data.append({
+                    "id": pur.id,
+                    "date": pur.date,
+                    "number": pur.invoice_number or f"PUR-{pur.id}",
+                    "total": pur.total_amount,
+                    "paid": pur.paid_amount,
+                    "status": pur.status,
+                    "desc": items_desc or "No Items"
+                })
+        
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/delete-invoice/<int:id>", methods=["POST"])
+@login_required("admin")
+def delete_invoice(id):
+    try:
+        inv = Invoice.query.get(id)
+        if not inv: return "Invoice not found", 404
+        
+        # Security: Only allow deleting "Opening Balance" type or generally any?
+        # User asked to "edit amount". Restricting to recent or Opening Balance is safest, 
+        # but to give full control (as requested), we allow delete.
+        # However, we must reverse stock if it wasn't an Opening Balance!
+        # Opening balances generally have items with no stock tracked (Service).
+        # Normal invoices have stock items.
+        
+        for item in inv.items:
+            # Revert Stock
+            p = Product.query.get(item.product_id)
+            if p: p.quantity += item.quantity
+        
+        # Soft delete or Hard delete? Hard delete for correction.
+        # But cascading deletes needed for InvoiceItem.
+        # SQLAlchemy cascade='all, delete-orphan' isn't explicitly set in models.
+        # So manual delete of items.
+        
+        InvoiceItem.query.filter_by(invoice_id=id).delete()
+        db.session.delete(inv)
+        db.session.commit()
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/delete-purchase/<int:id>", methods=["POST"])
+@login_required("admin")
+def delete_purchase(id):
+    try:
+        pur = Purchase.query.get(id)
+        if not pur: return "Purchase not found", 404
+        
+        for item in pur.items:
+            # Revert Stock (Decrease)
+            p = Product.query.get(item.product_id)
+            if p: p.quantity -= item.quantity
+        
+        PurchaseItem.query.filter_by(purchase_id=id).delete()
+        db.session.delete(pur)
+        db.session.commit()
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/record_purchase", methods=["GET", "POST"])
 @login_required("admin")
 def record_purchase():
     if request.method == "POST":
@@ -727,11 +984,15 @@ def record_purchase():
 
             # 4. Save Items and Update Stock
             for item in items:
+                # Get Product Name for History
+                p = Product.query.get(item["product_id"])
+                product_name_str = f"{p.category} {p.size} {p.type}" if p else f"Unknown Product (ID {item['product_id']})"
+                
                 # Add Purchase Item
                 pi = PurchaseItem(
                     purchase_id=new_purchase.id,
                     product_id=item["product_id"],
-                    product_name="(Ref ID " + str(item["product_id"]) + ")",
+                    product_name=product_name_str,
                     quantity=item["qty"],
                     cost_price=item["cost"],
                     total_amount=item["total"]
@@ -739,7 +1000,6 @@ def record_purchase():
                 db.session.add(pi)
                 
                 # UPDATE STOCK
-                p = Product.query.get(item["product_id"])
                 if p:
                     p.quantity += item["qty"]
                     # Optionally update cost price behavior if needed
@@ -760,8 +1020,11 @@ def record_purchase():
             db.session.rollback()
             return f"Error recording purchase: {e}", 500
 
-    # Fetch products for Datalist
-    products_obj = Product.query.filter_by(is_active=True).all()
+    # Fetch products for Datalist (Exclude Opening Balance dummy products)
+    products_obj = Product.query.filter(
+        Product.is_active == True,
+        Product.category != 'Opening Balance'
+    ).all()
     
     # Fetch Categories for New Product Modal
     categories_obj = Category.query.order_by(Category.name).all()
@@ -815,3 +1078,4 @@ def export_inventory():
 # =========================
 if __name__ == "__main__":
     app.run(debug=True)
+

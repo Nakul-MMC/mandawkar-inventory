@@ -1,9 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
 
-<form method="POST" class="h-full flex flex-col" x-data="{ total: 0 }">
+<form method="POST" class="h-full flex flex-col" x-data="{ total: 0, search: '' }">
 
   <!-- TOP SECTION: Customer & Settings (Compact 2-Col) -->
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+    <h2 class="text-xl font-bold text-gray-800">New Invoice</h2>
+
+    <!-- Product Search -->
+    <div class="w-full md:w-64 relative">
+      <input type="text" x-model="search" placeholder="Filter Products..."
+        class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 transition-all">
+      <i class="bi bi-search absolute left-3 top-2.5 text-gray-400 text-xs"></i>
+    </div>
+  </div>
+
   <div class="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
 
     <!-- Customer Info (Cols 1-7) -->
@@ -26,6 +37,11 @@
             class="w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white text-sm py-2 px-3 focus:ring-2 focus:ring-blue-500">
         </div>
       </div>
+      <div class="mb-3">
+        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Customer Phone (Optional)</label>
+        <input name="customer_phone" type="text" placeholder="10-digit number"
+          class="w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white text-sm py-2 px-3 focus:ring-2 focus:ring-blue-500">
+      </div>
       <div class="w-full">
         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Invoice Date</label>
         <input name="invoice_date" type="date" value="{{ today }}" required
@@ -40,15 +56,18 @@
         <div class="flex items-center">
           <input name="discount" type="number" step="0.01" value="0"
             class="w-full rounded-l-lg border-gray-200 bg-gray-50 focus:bg-white text-sm py-2 px-3 focus:ring-2 focus:ring-blue-500">
-          <span class="bg-gray-100 border border-l-0 border-gray-200 rounded-r-lg px-3 py-2 text-xs text-gray-500">% or
-            ₹</span>
+          <select name="discount_type" id="discount_type"
+            class="bg-gray-100 border border-l-0 border-gray-200 rounded-r-lg px-2 py-2 text-xs text-gray-600 font-bold focus:ring-0 outline-none">
+            <option value="amount">₹</option>
+            <option value="percent">%</option>
+          </select>
         </div>
       </div>
 
       <div class="flex space-x-3">
         <div class="flex-1">
-          <label class="flex items-center text-xs font-bold text-gray-500 uppercase mb-1">
-            <input type="checkbox" name="enable_cgst" checked
+          <label class="flex items-center text-xs font-bold text-gray-500 uppercase mb-1 cursor-pointer">
+            <input type="checkbox" name="enable_cgst" id="cgst_check"
               class="rounded text-blue-600 focus:ring-blue-500 mr-2 h-3 w-3">
             CGST %
           </label>
@@ -56,8 +75,8 @@
             class="w-full rounded-lg border-gray-200 bg-gray-50 focus:bg-white text-sm py-2 px-3 text-center">
         </div>
         <div class="flex-1">
-          <label class="flex items-center text-xs font-bold text-gray-500 uppercase mb-1">
-            <input type="checkbox" name="enable_sgst" checked
+          <label class="flex items-center text-xs font-bold text-gray-500 uppercase mb-1 cursor-pointer">
+            <input type="checkbox" name="enable_sgst" id="sgst_check"
               class="rounded text-blue-600 focus:ring-blue-500 mr-2 h-3 w-3">
             SGST %
           </label>
@@ -84,7 +103,8 @@
     <!-- Scrollable Body -->
     <div class="overflow-y-auto flex-1 p-2 space-y-1">
       {% for p in products %}
-      <div
+      {% set search_str = (p[1] ~ ' ' ~ p[2] ~ ' ' ~ p[3] ~ ' ' ~ p[4] ~ ' ' ~ p[5])|lower %}
+      <div x-show="search === '' || '{{ search_str }}'.includes(search.toLowerCase())"
         class="grid grid-cols-12 gap-4 items-center p-2 rounded-lg hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-100 group">
 
         <!-- Product Name -->
@@ -143,13 +163,103 @@
       </div>
 
       <button type="submit"
-        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-10 rounded-full shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 flex items-center text-lg">
+        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-8 rounded-full shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 flex items-center text-base">
         <span>Generate Invoice</span>
-        <i class="bi bi-arrow-right-short text-2xl ml-1"></i>
+        <i class="bi bi-arrow-right-short text-xl ml-1"></i>
       </button>
     </div>
   </div>
 
 </form>
+
+<script>
+  // Live Calculation Logic
+  const form = document.querySelector('form');
+
+  // Inputs at top
+  // Inputs at top
+  const discountInput = document.querySelector('input[name="discount"]');
+  const discountTypeInput = document.querySelector('select[name="discount_type"]');
+  const cgstRateInput = document.querySelector('input[name="cgst_percent"]');
+  const sgstRateInput = document.querySelector('input[name="sgst_percent"]');
+  const cgstCheck = document.getElementById('cgst_check');
+  const sgstCheck = document.getElementById('sgst_check');
+
+  // Listen for inputs
+  form.addEventListener('input', calculateTotals);
+  form.addEventListener('change', calculateTotals);
+
+  function calculateTotals() {
+    let subtotal = 0;
+
+    // Find all Quantity inputs
+    const qtyInputs = document.querySelectorAll('input[name^="qty_"]');
+
+    qtyInputs.forEach(q => {
+      const qty = parseFloat(q.value) || 0;
+      if (qty > 0) {
+        const id = q.getAttribute('name').split('_')[1];
+        const priceInput = document.querySelector(`input[name="price_${id}"]`);
+        const price = parseFloat(priceInput.value) || 0;
+        subtotal += qty * price;
+      }
+    });
+
+    // Discount Logic
+    const discountVal = parseFloat(discountInput.value) || 0;
+    let discountAmount = 0;
+
+    // Check Type
+    const type = discountTypeInput ? discountTypeInput.value : 'amount';
+    if (type === 'percent') {
+      discountAmount = subtotal * (discountVal / 100);
+    } else {
+      discountAmount = discountVal;
+    }
+
+    const taxable = Math.max(0, subtotal - discountAmount);
+
+    let totalTax = 0;
+    // CGST
+    if (cgstCheck && cgstCheck.checked) {
+      const rate = parseFloat(cgstRateInput.value) || 0;
+      totalTax += taxable * (rate / 100);
+    }
+    // SGST
+    if (sgstCheck && sgstCheck.checked) {
+      const rate = parseFloat(sgstRateInput.value) || 0;
+      totalTax += taxable * (rate / 100);
+    }
+
+    const finalTotal = taxable + totalTax;
+
+    updateFooterDisplay(subtotal, discountAmount, totalTax, finalTotal);
+  }
+
+  function updateFooterDisplay(sub, disc, tax, total) {
+    let container = document.getElementById('live-totals-container');
+    if (!container) {
+      // Create container in footer
+      const footerInner = document.querySelector('.fixed.bottom-0 .max-w-7xl .flex.items-center.space-x-6');
+      container = document.createElement('div');
+      container.id = 'live-totals-container';
+      container.className = 'flex space-x-4 text-sm font-medium mr-4';
+      // Insert before the button (or replace helper text)
+      // Actually, let's append to the left side container
+      footerInner.appendChild(container);
+
+      // Hide helper text on mobile if needed
+    }
+
+    container.innerHTML = `
+            <div class="flex flex-col md:flex-row md:space-x-4 text-gray-700">
+                <span>Sub: <span class="font-bold">₹${sub.toFixed(2)}</span></span>
+                ${disc > 0 ? `<span class="text-emerald-600">Disc: -₹${disc.toFixed(2)}</span>` : ''}
+                <span class="text-red-500">Tax: +₹${tax.toFixed(2)}</span>
+                <span class="text-blue-700 text-lg font-bold border-l pl-4 border-gray-300">Total: ₹${total.toFixed(2)}</span>
+            </div>
+        `;
+  }
+</script>
 
 {% endblock %}
