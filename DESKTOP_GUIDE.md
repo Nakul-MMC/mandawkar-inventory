@@ -30,12 +30,6 @@ Simply double-click **`Inventory Manager.exe`**.
 *   Login with `admin` / `admin123`.
 *   When you are done, you can close the black console window (if visible) or just close the browser.
 
-## File Locations
-When you run the app, it will create folders next to the `.exe` to save your files:
-*   **`data/`**: Stores your database (`db.sqlite3`). **Keep this safe!**
-*   **`invoices/`**: All generated PDF invoices are saved here.
-*   **`exports/`**: Any Excel exports you download are saved here.
-
 ## How to Update the App (Without Data Loss)
 If you (the developer) make changes to the code to fix bugs or add features:
 

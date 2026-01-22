@@ -11,7 +11,18 @@ if __name__ == "__main__":
     # Determine if we are running as a script or frozen exe
     if getattr(sys, 'frozen', False):
         # We are running in a bundle (PyInstaller)
-        print("Running in Desktop Mode.")
+        # The executable is located at sys.executable
+        # We want the database to be stored NEXT to the executable, not inside the temp folder
+        base_dir = os.path.dirname(sys.executable)
+        
+        # Create a defined 'data' folder for the database
+        data_dir = os.path.join(base_dir, 'data')
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
+            
+        db_path = os.path.join(data_dir, 'db.sqlite3')
+        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+        print(f"Running in Desktop Mode. Database: {db_path}")
     else:
         # Running as normal python script
         print("Running in Development Mode.")

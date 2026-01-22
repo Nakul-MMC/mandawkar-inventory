@@ -8,11 +8,6 @@ echo [1/3] Installing PyInstaller...
 pip install pyinstaller
 
 echo.
-echo [1.5/3] Closing running instances...
-taskkill /F /IM "Inventory Manager.exe" 2>nul
-taskkill /F /IM "launcher.exe" 2>nul
-
-echo.
 echo [2/3] Cleaning previous builds...
 rmdir /s /q build
 rmdir /s /q dist
@@ -25,14 +20,11 @@ echo This might take a minute...
 pyinstaller --noconfirm --onefile --windowed --name "Inventory Manager" ^
     --add-data "templates;templates" ^
     --add-data "static;static" ^
-    --add-data "utils;utils" ^
     --hidden-import "reportlab" ^
     --hidden-import "reportlab.platypus" ^
     --hidden-import "reportlab.lib.styles" ^
     --hidden-import "uuid" ^
     --hidden-import "sqlite3" ^
-    --hidden-import "openpyxl" ^
-    --hidden-import "et_xmlfile" ^
     launcher.py
 
 echo.

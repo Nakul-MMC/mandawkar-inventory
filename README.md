@@ -8,10 +8,8 @@ A robust, Flask-based Inventory and Finance management system designed for small
 *   **Billing & Invoicing**: Create GST-compliant invoices with automatic stock deduction.
 *   **Finance Dashboard**: Track Customer Receivables and Dealer Payables (Sorted by Pending status).
 *   **Stock In**: Record purchases from dealers, update stock, and manage payables in one flow.
-*   **History Search**: Instantly find past invoices by Customer Name or Invoice ID.
-*   **PDF Generation**: Download professional Invoice PDFs (works in Desktop Mode too).
-*   **Excel Export**: Export complete inventory data for analysis.
-*   **Desktop App**: Runs as a standalone `.exe` without needing command line.
+*   **PDF Generation**: Download professional Invoice PDFs.
+*   **Excel Export**: Export inventory data for reporting.
 *   **Audit Logs**: Track every action (Create, Update, Delete) in the system.
 
 ---
